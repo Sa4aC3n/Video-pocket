@@ -664,16 +664,12 @@ fun HomeScreen(
                                     }
                                 }
 
-                                Text(t("Audio Format:", "صيغة الصوت:"), fontWeight = FontWeight.SemiBold)
-                                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf("mp3", "m4a").forEach { fmt ->
-                                        FilterChip(
-                                            selected = audioFormat == fmt,
-                                            onClick = { audioFormat = fmt },
-                                            label = { Text(fmt.uppercase()) }
-                                        )
-                                    }
-                                }
+                                Text(t("Audio Output Format:", "صيغة الملف الصوتي الناتج:"), fontWeight = FontWeight.SemiBold)
+                                Text(
+                                    t("MP3 is currently supported. M4A conversion is not yet implemented.", "صيغة MP3 مدعومة حاليًا. تحويل M4A لم يُنفذ بعد."),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
 
                                 Button(
                                     onClick = {

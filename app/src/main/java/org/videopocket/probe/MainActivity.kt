@@ -255,7 +255,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 record(result)
-                if (!result.success || result.outputUri.isNullOrBlank()) {
+                if (!result.passed || result.outputUri.isNullOrBlank()) {
                     problem = Problem.ENGINE
                     PocketNotifier.dismiss(getApplication())
                     return@launch
@@ -314,7 +314,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 record(result)
-                if (!result.success || result.outputUri.isNullOrBlank()) {
+                if (!result.passed || result.outputUri.isNullOrBlank()) {
                     problem = Problem.ENGINE
                     PocketNotifier.dismiss(getApplication())
                     return@launch

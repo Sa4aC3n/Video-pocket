@@ -653,9 +653,9 @@ fun HomeScreen(
                         1 -> {
                             // AUDIO TAB
                             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                                Text(t("Bitrate Quality:", "جودة الصوت:"), fontWeight = FontWeight.SemiBold)
+                                Text(t("Output MP3 encoding bitrate (not source quality):", "معدل ترميز ملف MP3 الناتج (وليس جودة المصدر):"), fontWeight = FontWeight.SemiBold)
                                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    listOf(320 to "320 kbps (High)", 192 to "192 kbps (Standard)", 128 to "128 kbps (Saver)").forEach { (br, label) ->
+                                    listOf(320 to "Convert to 320 kbps", 192 to "Convert to 192 kbps", 128 to "Convert to 128 kbps").forEach { (br, label) ->
                                         FilterChip(
                                             selected = selectedBitrate == br,
                                             onClick = { selectedBitrate = br },
@@ -687,7 +687,7 @@ fun HomeScreen(
                                 ) {
                                     Icon(Icons.Default.Audiotrack, contentDescription = null)
                                     Spacer(Modifier.width(8.dp))
-                                    Text(t("Extract Audio ($selectedBitrate kbps)", "استخراج الصوت ($selectedBitrate kbps)"))
+                                    Text(t("Convert to MP3 ($selectedBitrate kbps)", "تحويل إلى MP3 ($selectedBitrate كيلوبت/ث)"))
                                 }
                             }
                         }

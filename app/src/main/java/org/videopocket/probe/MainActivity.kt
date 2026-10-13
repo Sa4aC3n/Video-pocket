@@ -255,6 +255,11 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 record(result)
+                if (!result.success || result.outputUri.isNullOrBlank()) {
+                    problem = Problem.ENGINE
+                    PocketNotifier.dismiss(getApplication())
+                    return@launch
+                }
                 val isAudio = action == ProbeAction.MP3 || action == ProbeAction.PLAYLIST_MP3
                 val item = PocketLibraryItem(
                     id = UUID.randomUUID().toString(),
@@ -309,6 +314,11 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
                     }
                 }
                 record(result)
+                if (!result.success || result.outputUri.isNullOrBlank()) {
+                    problem = Problem.ENGINE
+                    PocketNotifier.dismiss(getApplication())
+                    return@launch
+                }
                 val tier = QualityTier.fromHeight(clip.height)
                 val item = PocketLibraryItem(
                     id = UUID.randomUUID().toString(),

@@ -146,13 +146,15 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 }
             }
             val title = json.optString("title", "Playlist").ifBlank { "Playlist" }
+            val playlistId = json.optString("id").ifBlank { null }
             return MediaInfo(
                 title = title,
                 duration = json.optDouble("duration").takeIf { it.isFinite() },
                 formats = emptyList(),
                 isPlaylist = true,
                 playlistCount = if (entryList.isNotEmpty()) entryList.size else json.optInt("playlist_count", 0),
-                entries = entryList
+                entries = entryList,
+                id = playlistId
             )
         }
 
@@ -199,6 +201,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         }
         val author = json.optString("uploader").ifBlank { json.optString("channel").ifBlank { json.optString("creator").ifBlank { null } } }
         val extractor = json.optString("extractor_key").ifBlank { json.optString("extractor").ifBlank { null } }
+        val mediaId = json.optString("id").ifBlank { null }
 
         return MediaInfo(
             title = json.optString("title", "Video"),
@@ -208,7 +211,8 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             streamUrl = directUrl,
             uploader = author,
             extractor = extractor,
-            subtitles = subList
+            subtitles = subList,
+            id = mediaId
         )
     }
 

@@ -64,7 +64,9 @@ data class DownloadTask(
     var outputUri: String? = null,
     var bytes: Long = 0L,
     var error: String? = null,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val canPause: Boolean = false,
+    val canResume: Boolean = false
 )
 
 class DownloadQueueManager(
@@ -77,7 +79,7 @@ class DownloadQueueManager(
     var tasks by mutableStateOf(listOf<DownloadTask>())
         private set
 
-    var maxConcurrent by mutableStateOf(2)
+    var maxConcurrent by mutableStateOf(AppSettings.maxConcurrentDownloads)
 
     val activeTasks: List<DownloadTask>
         get() = tasks.filter { it.state == DownloadState.DOWNLOADING || it.state == DownloadState.MERGING || it.state == DownloadState.SAVING || it.state == DownloadState.RESOLVING }
@@ -234,7 +236,9 @@ class DownloadQueueManager(
                 fileSizeBytes = result.bytes,
                 createdAt = System.currentTimeMillis(),
                 thumbnailUri = mediaInfo.thumbnailUrl,
-                platform = task.platform
+                platform = task.platform,
+                sourceMediaId = mediaInfo.id,
+                sourceUrl = task.url
             )
             PocketLibraryManager.addItem(application, libraryItem)
 

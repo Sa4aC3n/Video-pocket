@@ -345,54 +345,66 @@ fun QuickSelectionChips(
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
-            FilterChip(
-                selected = false,
-                onClick = {
-                    val s = (totalDuration - 15.0).coerceAtLeast(0.0)
-                    onApplyRange(s, totalDuration)
-                },
-                label = { Text(t("Last 15s", "آخر ١٥ ثانية")) }
-            )
-            FilterChip(
-                selected = false,
-                onClick = {
-                    val s = (totalDuration - 30.0).coerceAtLeast(0.0)
-                    onApplyRange(s, totalDuration)
-                },
-                label = { Text(t("Last 30s", "آخر ٣٠ ثانية")) }
-            )
-            FilterChip(
-                selected = false,
-                onClick = {
-                    val s = (totalDuration - 60.0).coerceAtLeast(0.0)
-                    onApplyRange(s, totalDuration)
-                },
-                label = { Text(t("Last 1 min", "آخر دقيقة")) }
-            )
-            FilterChip(
-                selected = false,
-                onClick = {
-                    val e = 30.0.coerceAtMost(totalDuration)
-                    onApplyRange(0.0, e)
-                },
-                label = { Text(t("First 30s", "أول ٣٠ ثانية")) }
-            )
-            FilterChip(
-                selected = false,
-                onClick = {
-                    val e = 60.0.coerceAtMost(totalDuration)
-                    onApplyRange(0.0, e)
-                },
-                label = { Text(t("First 1 min", "أول دقيقة")) }
-            )
-            FilterChip(
-                selected = false,
-                onClick = {
-                    val e = 300.0.coerceAtMost(totalDuration)
-                    onApplyRange(0.0, e)
-                },
-                label = { Text(t("First 5 min", "أول ٥ دقائق")) }
-            )
+            if (totalDuration >= 15.0) {
+                FilterChip(
+                    selected = false,
+                    onClick = {
+                        val s = (totalDuration - 15.0).coerceAtLeast(0.0)
+                        onApplyRange(s, totalDuration)
+                    },
+                    label = { Text(t("Last 15s", "آخر ١٥ ثانية")) }
+                )
+                FilterChip(
+                    selected = false,
+                    onClick = {
+                        onApplyRange(0.0, 15.0.coerceAtMost(totalDuration))
+                    },
+                    label = { Text(t("First 15s", "أول ١٥ ثانية")) }
+                )
+            }
+            if (totalDuration >= 30.0) {
+                FilterChip(
+                    selected = false,
+                    onClick = {
+                        val s = (totalDuration - 30.0).coerceAtLeast(0.0)
+                        onApplyRange(s, totalDuration)
+                    },
+                    label = { Text(t("Last 30s", "آخر ٣٠ ثانية")) }
+                )
+                FilterChip(
+                    selected = false,
+                    onClick = {
+                        onApplyRange(0.0, 30.0.coerceAtMost(totalDuration))
+                    },
+                    label = { Text(t("First 30s", "أول ٣٠ ثانية")) }
+                )
+            }
+            if (totalDuration >= 60.0) {
+                FilterChip(
+                    selected = false,
+                    onClick = {
+                        val s = (totalDuration - 60.0).coerceAtLeast(0.0)
+                        onApplyRange(s, totalDuration)
+                    },
+                    label = { Text(t("Last 1 min", "آخر دقيقة")) }
+                )
+                FilterChip(
+                    selected = false,
+                    onClick = {
+                        onApplyRange(0.0, 60.0.coerceAtMost(totalDuration))
+                    },
+                    label = { Text(t("First 1 min", "أول دقيقة")) }
+                )
+            }
+            if (totalDuration >= 300.0) {
+                FilterChip(
+                    selected = false,
+                    onClick = {
+                        onApplyRange(0.0, 300.0.coerceAtMost(totalDuration))
+                    },
+                    label = { Text(t("First 5 min", "أول ٥ دقائق")) }
+                )
+            }
         }
     }
 }

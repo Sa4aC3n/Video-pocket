@@ -626,7 +626,8 @@ object SmartPublicResolver {
                             )
                         },
                         thumbnailUrl = thumbnail,
-                        streamUrl = streamUrl
+                        streamUrl = streamUrl,
+                        id = directInfo?.id ?: targetUrl.hashCode().toString()
                     )
 
                     return MediaResolverResult.Success(

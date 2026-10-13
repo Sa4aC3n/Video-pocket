@@ -44,7 +44,9 @@ object PocketLibraryManager {
                         thumbnailUri = obj.optString("thumbnailUri").takeIf { it.isNotBlank() },
                         platform = obj.optString("platform").takeIf { it.isNotBlank() },
                         isFavorite = obj.optBoolean("isFavorite", false),
-                        collections = colList
+                        collections = colList,
+                        sourceMediaId = obj.optString("sourceMediaId").takeIf { it.isNotBlank() },
+                        sourceUrl = obj.optString("sourceUrl").takeIf { it.isNotBlank() }
                     )
                 )
             }
@@ -76,6 +78,8 @@ object PocketLibraryManager {
                     val cols = JSONArray()
                     item.collections.forEach { cols.put(it) }
                     put("collections", cols)
+                    put("sourceMediaId", item.sourceMediaId ?: "")
+                    put("sourceUrl", item.sourceUrl ?: "")
                 }
                 array.put(obj)
             }

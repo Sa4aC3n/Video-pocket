@@ -34,7 +34,8 @@ data class MediaInfo(
     val streamUrl: String? = null,
     val uploader: String? = null,
     val extractor: String? = null,
-    val subtitles: List<SubtitleTrack> = emptyList()
+    val subtitles: List<SubtitleTrack> = emptyList(),
+    val id: String? = null
 ) {
     val heights get() = formats.filter { it.video && it.height in 1..2160 }.map { it.height }.distinct().sortedDescending()
     val defaultHeight get() = heights.firstOrNull { it <= 1080 } ?: heights.minOrNull() ?: 1080
@@ -140,7 +141,9 @@ data class PocketLibraryItem(
     val thumbnailUri: String? = null,
     val platform: String? = null,
     val isFavorite: Boolean = false,
-    val collections: List<String> = emptyList()
+    val collections: List<String> = emptyList(),
+    val sourceMediaId: String? = null,
+    val sourceUrl: String? = null
 )
 
 object LinkPolicy {

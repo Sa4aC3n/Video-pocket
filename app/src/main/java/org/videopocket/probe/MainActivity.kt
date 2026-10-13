@@ -267,7 +267,9 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
                     fileSizeBytes = result.bytes,
                     createdAt = System.currentTimeMillis(),
                     thumbnailUri = media.thumbnailUrl,
-                    platform = normalizedMetadata?.platform
+                    platform = normalizedMetadata?.platform,
+                    sourceMediaId = normalizedMetadata?.id ?: media.id,
+                    sourceUrl = normalizedMetadata?.canonicalUrl ?: url
                 )
                 PocketLibraryManager.addItem(getApplication(), item)
                 refreshLibrary()
@@ -320,7 +322,9 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
                     fileSizeBytes = result.bytes,
                     createdAt = System.currentTimeMillis(),
                     thumbnailUri = media.thumbnailUrl,
-                    platform = normalizedMetadata?.platform
+                    platform = normalizedMetadata?.platform,
+                    sourceMediaId = normalizedMetadata?.id ?: media.id,
+                    sourceUrl = normalizedMetadata?.canonicalUrl ?: url
                 )
                 PocketLibraryManager.addItem(getApplication(), item)
                 refreshLibrary()

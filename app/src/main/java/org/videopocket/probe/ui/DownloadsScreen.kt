@@ -335,29 +335,43 @@ fun DownloadTaskCard(
             ) {
                 when (task.state) {
                     DownloadState.DOWNLOADING -> {
-                        OutlinedButton(
-                            onClick = onPause,
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Icon(Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(t("Pause", "إيقاف مؤقت"))
+                        if (task.canPause) {
+                            OutlinedButton(
+                                onClick = onPause,
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.Pause, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(t("Pause", "إيقاف مؤقت"))
+                            }
+                            Spacer(Modifier.width(6.dp))
                         }
-                        Spacer(Modifier.width(6.dp))
                         TextButton(onClick = onCancel) {
                             Text(t("Cancel", "إلغاء"), color = MaterialTheme.colorScheme.error)
                         }
                     }
                     DownloadState.PAUSED -> {
-                        Button(
-                            onClick = onResume,
-                            shape = RoundedCornerShape(8.dp),
-                            contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
-                        ) {
-                            Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
-                            Spacer(Modifier.width(4.dp))
-                            Text(t("Resume", "استئناف"))
+                        if (task.canResume) {
+                            Button(
+                                onClick = onResume,
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.PlayArrow, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(t("Resume", "استئناف"))
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = onRetry,
+                                shape = RoundedCornerShape(8.dp),
+                                contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                            ) {
+                                Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text(t("Restart", "إعادة البدء"))
+                            }
                         }
                         Spacer(Modifier.width(6.dp))
                         TextButton(onClick = onCancel) {

@@ -245,6 +245,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 ?: folder.listFiles()?.firstOrNull { it.isFile && it.extension in setOf("mp4", "webm", "mkv", "mp3", "m4a", "mov") }
                 ?: throw ProbeFailure(Problem.CONVERSION)
             val tracks = validateOutput(output, action)
+            if (output.length() <= 0L) throw ProbeFailure(Problem.CONVERSION, "Empty output file")
             val saved = publish(output, action)
             return ProbeResult(action, (System.nanoTime() - started) / 1_000_000, output.length(), saved, true, tracks)
         } finally {
@@ -322,6 +323,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 ?: folder.listFiles()?.firstOrNull { it.isFile && it.extension in setOf("mp4", "webm", "mkv", "mp3", "m4a", "mov") }
                 ?: throw ProbeFailure(Problem.CONVERSION, "Clip segment processing failed")
 
+            if (output.length() <= 0L) throw ProbeFailure(Problem.CONVERSION, "Empty clip output")
             val safeTitle = info.title.take(30).replace(Regex("[^a-zA-Z0-9._-]"), "_").trim('_').ifBlank { "Video" }
             fun formatCompact(sec: Double): String {
                 val totalSec = sec.toLong().coerceAtLeast(0L)

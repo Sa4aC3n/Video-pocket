@@ -54,3 +54,9 @@ Phases 5–8 implementation, final Gradle/lint/regression results, device media 
 - Download format selections now reach the engine and request the chosen container. Unsupported codec/container combinations fail explicitly; Studio offers actual re-encoding options.
 - Batch quality is resolved from the source instead of assuming 1080p. New share intents update Home correctly. Public-page redirects are bounded and validated, localhost/link-local loopback targets are rejected, and error-body reads are bounded.
 - Limitation: tasks run while the app process lives; this milestone does not implement a persistent background foreground service. UI states that keeping the app open is required. Process-death recovery restarts downloads rather than resuming partial bytes.
+
+## Verified build milestone
+
+- GitHub Actions run **38509393540** on exact commit `980d9b09e9159424f8332c9571b270cfd1c15be4`: **SUCCESS**. `testDebugUnitTest assembleDebug lintDebug` completed (`BUILD SUCCESSFUL in 6m 8s`). This is an actual Gradle result from a full checkout, not a static estimate.
+- UI/queue milestone commit `d05604bc9a881475877790a24f4fa2d10f38a366` is synchronized; its separate CI run is still in progress at this checkpoint.
+- Added Robolectric tests for index corruption preservation, batch metadata/deduplication, active workspace safety, and interrupted queue restoration. Added emulator instrumentation for lazy startup and actual FFmpeg compression/trim/audio extraction, timestamp progress and original SHA-256 preservation. These new tests are pending execution.

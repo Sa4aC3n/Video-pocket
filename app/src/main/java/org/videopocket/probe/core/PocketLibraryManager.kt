@@ -6,8 +6,13 @@ import android.net.Uri
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import android.util.AtomicFile
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.asStateFlow
 
 object PocketLibraryManager {
+    private val changes = MutableStateFlow(0L)
+    val revisions = changes.asStateFlow()
     private const val FILE_NAME = "pocket_library.json"
 
     private fun getFile(context: Context): File = File(context.filesDir, FILE_NAME)
@@ -15,9 +20,9 @@ object PocketLibraryManager {
     @Synchronized
     fun getItems(context: Context): List<PocketLibraryItem> {
         val file = getFile(context)
-        if (!file.exists()) return emptyList()
+        if (!file.exists() && !File(file.path + ".bak").exists()) return emptyList()
         return try {
-            val text = file.readText()
+            val text = AtomicFile(file).openRead().bufferedReader().use { it.readText() }
             val array = JSONArray(text)
             val items = mutableListOf<PocketLibraryItem>()
             for (i in 0 until array.length()) {
@@ -51,13 +56,15 @@ object PocketLibraryManager {
                 )
             }
             items.sortedByDescending { it.createdAt }
-        } catch (_: Exception) {
-            emptyList()
+        } catch (failure: Exception) {
+            throw java.io.IOException("Library index could not be read; original retained", failure)
         }
     }
 
     @Synchronized
     fun saveItems(context: Context, items: List<PocketLibraryItem>) {
+        val atomic = AtomicFile(getFile(context))
+        var stream: java.io.FileOutputStream? = null
         try {
             val array = JSONArray()
             items.forEach { item ->
@@ -83,8 +90,14 @@ object PocketLibraryManager {
                 }
                 array.put(obj)
             }
-            getFile(context).writeText(array.toString(2))
-        } catch (_: Exception) {}
+            stream = atomic.startWrite()
+            stream.write(array.toString().toByteArray(Charsets.UTF_8))
+            atomic.finishWrite(stream)
+            changes.value += 1
+        } catch (failure: Exception) {
+            atomic.failWrite(stream)
+            throw java.io.IOException("Library index could not be saved; previous index retained", failure)
+        }
     }
 
     @Synchronized
@@ -107,8 +120,13 @@ object PocketLibraryManager {
 
     @Synchronized
     fun addItem(context: Context, item: PocketLibraryItem) {
-        val existing = getItems(context).filter { it.id != item.id }
-        saveItems(context, listOf(item) + existing)
+        addItems(context, listOf(item))
+    }
+
+    @Synchronized
+    fun addItems(context: Context, items: List<PocketLibraryItem>) {
+        val incomingUris = items.map { it.uriString }.toSet()
+        saveItems(context, items + getItems(context).filter { it.uriString !in incomingUris })
     }
 
     @Synchronized
@@ -116,10 +134,8 @@ object PocketLibraryManager {
         val current = getItems(context)
         val item = current.firstOrNull { it.id == id }
         if (item != null) {
-            try {
-                val uri = Uri.parse(item.uriString)
-                context.contentResolver.delete(uri, null, null)
-            } catch (_: Exception) {}
+            val uri = Uri.parse(item.uriString)
+            check(context.contentResolver.delete(uri, null, null) > 0) { "Media was not deleted; library entry retained" }
         }
         val remaining = current.filter { it.id != id }
         saveItems(context, remaining)

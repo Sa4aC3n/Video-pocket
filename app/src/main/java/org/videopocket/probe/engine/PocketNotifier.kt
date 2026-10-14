@@ -55,8 +55,8 @@ object PocketNotifier {
             val builder = NotificationCompat.Builder(context, CHANNEL_ID)
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setContentTitle(title)
-                .setContentText("$stageText ($percent%)")
-                .setProgress(100, percent, percent <= 0)
+                .setContentText(if (percent >= 0) "$stageText ($percent%)" else stageText)
+                .setProgress(100, percent.coerceIn(0, 100), percent < 0)
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setContentIntent(pendingIntent)
@@ -75,7 +75,7 @@ object PocketNotifier {
                 Intent(Intent.ACTION_VIEW).apply {
                     setDataAndType(
                         Uri.parse(uriString),
-                        if (uriString.endsWith(".mp3", ignoreCase = true)) "audio/mpeg" else "video/*"
+                        context.contentResolver.getType(Uri.parse(uriString)) ?: "video/*"
                     )
                     addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                 }

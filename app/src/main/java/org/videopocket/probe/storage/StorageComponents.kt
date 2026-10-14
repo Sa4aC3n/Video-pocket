@@ -34,23 +34,7 @@ object FileNamingEngine {
 object TempFileManager {
 
     fun cleanupTemporaryFiles(context: Context): Long {
-        var freedBytes = 0L
-        try {
-            val probeDir = File(context.noBackupFilesDir, "probe-files")
-            if (probeDir.exists()) {
-                probeDir.listFiles()?.forEach { file ->
-                    freedBytes += file.length()
-                    file.deleteRecursively()
-                }
-            }
-            context.cacheDir.listFiles()?.forEach { file ->
-                if (file.name.endsWith(".tmp") || file.name.endsWith(".part")) {
-                    freedBytes += file.length()
-                    file.delete()
-                }
-            }
-        } catch (_: Exception) {}
-        return freedBytes
+        return Workspaces.clean(context)
     }
 
     fun getTempFilesSize(context: Context): Long {
@@ -121,12 +105,14 @@ object StorageManager {
     }
 
     fun clearCache(context: Context): Long {
-        val sizeBefore = calculateDirSize(context.cacheDir)
-        try {
-            context.cacheDir.deleteRecursively()
-            context.cacheDir.mkdirs()
-        } catch (_: Exception) {}
-        return sizeBefore
+        var freed = 0L
+        val staleBefore = System.currentTimeMillis() - 24L * 60 * 60 * 1000
+        context.cacheDir.listFiles()?.filter { it.lastModified() < staleBefore }?.forEach { file ->
+            val before = Workspaces.size(file)
+            file.deleteRecursively()
+            freed += (before - Workspaces.size(file)).coerceAtLeast(0L)
+        }
+        return freed
     }
 
     private fun calculateDirSize(dir: File): Long {

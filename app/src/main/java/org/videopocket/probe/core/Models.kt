@@ -37,8 +37,8 @@ data class MediaInfo(
     val subtitles: List<SubtitleTrack> = emptyList(),
     val id: String? = null
 ) {
-    val heights get() = formats.filter { it.video && it.height in 1..2160 }.map { it.height }.distinct().sortedDescending()
-    val defaultHeight get() = heights.firstOrNull { it <= 1080 } ?: heights.minOrNull() ?: 1080
+    val heights get() = formats.filter { it.video && it.height > 0 }.map { it.height }.distinct().sortedDescending()
+    val defaultHeight get() = heights.firstOrNull { it <= 1080 } ?: heights.minOrNull() ?: 0
 }
 data class ProbeResult(val action: ProbeAction, val elapsedMs: Long, val bytes: Long, val outputUri: String?, val passed: Boolean, val detail: String, val outputUris: List<String> = emptyList())
 
@@ -106,23 +106,12 @@ data class ClipRequest(
             val clean = text.trim()
             if (clean.isBlank()) return null
             val parts = clean.split(":")
-            return try {
-                when (parts.size) {
-                    1 -> parts[0].toDoubleOrNull()
-                    2 -> {
-                        val m = parts[0].toDouble()
-                        val s = parts[1].toDouble()
-                        m * 60 + s
-                    }
-                    3 -> {
-                        val h = parts[0].toDouble()
-                        val m = parts[1].toDouble()
-                        val s = parts[2].toDouble()
-                        h * 3600 + m * 60 + s
-                    }
-                    else -> null
-                }
-            } catch (_: Exception) { null }
+            if (parts.size !in 1..3) return null
+            val values = parts.map { it.toDoubleOrNull() ?: return null }
+            if (values.any { !it.isFinite() || it < 0.0 }) return null
+            if (values.drop(1).any { it >= 60.0 }) return null
+            if (values.dropLast(1).any { it % 1.0 != 0.0 }) return null
+            return values.fold(0.0) { total, value -> total * 60 + value }.takeIf { it.isFinite() }
         }
     }
 }
@@ -165,7 +154,7 @@ object FormatPolicy {
             return id
         }
         val audio = info.formats.filter { it.audio && !it.video }.maxByOrNull { it.bytes ?: 0 }
-        val videos = info.formats.filter { it.video && (it.height == height || it.height == 0) }
+        val videos = info.formats.filter { it.video && it.height == height }
         return when (action) {
             ProbeAction.INSPECT -> "best"
             ProbeAction.MP3 -> safe((audio ?: info.formats.lastOrNull { it.audio }

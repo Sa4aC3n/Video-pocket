@@ -18,6 +18,7 @@ import org.videopocket.probe.core.*
 import org.videopocket.probe.R
 import java.io.File
 import java.util.UUID
+import org.videopocket.probe.storage.Workspaces
 
 enum class EngineState {
     NOT_INITIALIZED,
@@ -35,17 +36,35 @@ interface MediaDownloader {
 class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloader {
     private val engine = YoutubeDL.getInstance()
     private val workRoot = File(context.noBackupFilesDir, "probe-files")
-    private var activeProcessId: String? = null
+    @Volatile private var activeProcessId: String? = null
+    @Volatile private var cancelRequested = false
+    private val operationLock = Any()
+    private var publishing = false
 
-    fun cancelCurrent(): Boolean {
-        val pid = activeProcessId ?: return false
-        return try {
-            val killed = engine.destroyProcessById(pid)
-            activeProcessId = null
-            killed
-        } catch (_: Exception) { false }
+    fun cancelCurrent(): Boolean = synchronized(operationLock) {
+        val pid = activeProcessId ?: return@synchronized false
+        if (publishing) return@synchronized false
+        cancelRequested = true
+        runCatching { engine.destroyProcessById(pid) }
+        true
     }
-    
+
+    private fun begin(id: String) = synchronized(operationLock) {
+        check(activeProcessId == null) { "Engine already has an operation" }
+        cancelRequested = false
+        publishing = false
+        activeProcessId = id
+    }
+
+    private fun checkCancelled() {
+        if (cancelRequested || Thread.currentThread().isInterrupted) throw ProbeFailure(Problem.CANCELED)
+    }
+
+    private fun beginPublishing() = synchronized(operationLock) {
+        checkCancelled()
+        // Once publication starts it finishes atomically; cancel is no longer accepted.
+        publishing = true
+    }
 
     @Synchronized fun initialize(): JSONObject {
         cachedInitResult?.let {
@@ -126,8 +145,16 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             .addOption("--flat-playlist")
             .addOption("--skip-download")
 
-        val response = engine.execute(req, null, null)
+        initialize()
+        val id = UUID.randomUUID().toString()
+        begin(id)
+        val response = try {
+            checkCancelled()
+            engine.execute(req, id, null).also { checkCancelled() }
+        } finally { activeProcessId = null }
         val json = JSONObject(response.out)
+        if (json.optBoolean("has_drm")) throw ProbeFailure(Problem.UNSUPPORTED)
+
         if (json.optBoolean("is_live") || json.optString("live_status") == "is_upcoming")
             throw ProbeFailure(Problem.LIVE_OR_PLAYLIST)
 
@@ -217,6 +244,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
     }
 
     override fun download(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, progress: (Float) -> Unit): ProbeResult {
+        initialize()
         require(action != ProbeAction.INSPECT)
         require(bitrate in setOf(128, 192, 320))
         val isPlaylist = info.isPlaylist || action == ProbeAction.PLAYLIST_VIDEO || action == ProbeAction.PLAYLIST_MP3
@@ -228,8 +256,8 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         if (StatFs(context.noBackupFilesDir.path).availableBytes < maxOf(256L * 1024 * 1024, estimate * 3))
             throw ProbeFailure(Problem.SPACE)
         val id = UUID.randomUUID().toString()
-        val folder = File(workRoot, id).apply { mkdirs() }
-        activeProcessId = id
+        val folder = Workspaces.create(context, id)
+        begin(id)
         val started = System.nanoTime()
         try {
             val req = request(url, allowPlaylist = false).addOption("--format", format)
@@ -240,17 +268,21 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             if (action == ProbeAction.MP3) req.addOption("--extract-audio")
                 .addOption("--audio-format", "mp3").addOption("--audio-quality", "${bitrate}K")
 
-            engine.execute(req, id) { percent, _, _ -> progress(percent.coerceIn(0f, 100f)) }
+            checkCancelled()
+            engine.execute(req, id) { percent, _, _ -> progress(if (percent.isFinite() && percent >= 0) percent.coerceAtMost(100f) else -1f) }
+            checkCancelled()
+            progress(-1f)
             val output = folder.listFiles()?.singleOrNull { it.isFile && it.extension in setOf("mp4", "webm", "mkv", "mp3", "m4a", "mov") }
                 ?: folder.listFiles()?.firstOrNull { it.isFile && it.extension in setOf("mp4", "webm", "mkv", "mp3", "m4a", "mov") }
                 ?: throw ProbeFailure(Problem.CONVERSION)
             val tracks = validateOutput(output, action)
             if (output.length() <= 0L) throw ProbeFailure(Problem.CONVERSION, "Empty output file")
-            val saved = publish(output, action)
+            beginPublishing()
+            val saved = publishWithName(output, action, info.title)
             return ProbeResult(action, (System.nanoTime() - started) / 1_000_000, output.length(), saved, true, tracks)
         } finally {
             if (activeProcessId == id) activeProcessId = null
-            folder.deleteRecursively()
+            Workspaces.release(folder)
         }
     }
 
@@ -260,10 +292,12 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         clip: ClipRequest,
         progress: (Float, String) -> Unit
     ): ProbeResult {
+        initialize()
+        require(clip.startSeconds.isFinite() && clip.endSeconds.isFinite())
         require(clip.startSeconds >= 0.0) { "Start time must be >= 0" }
         require(clip.endSeconds > clip.startSeconds) { "End time must be > start time" }
-        val totalDur = info.duration ?: 3600.0
-        require(clip.startSeconds < totalDur) { "Start time exceeds video duration" }
+        val totalDur = info.duration?.takeIf { it.isFinite() && it > 0 } ?: throw ProbeFailure(Problem.UNSUPPORTED, "Duration unavailable")
+        require(clip.endSeconds <= totalDur) { "End time exceeds video duration" }
 
         val durationRatio = (clip.durationSeconds / totalDur).coerceIn(0.01, 1.0)
         val selectedFormat = info.formats.filter { it.height == clip.height }.maxByOrNull { it.bytes ?: 0 }
@@ -273,8 +307,8 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             throw ProbeFailure(Problem.SPACE)
 
         val id = UUID.randomUUID().toString()
-        val folder = File(workRoot, id).apply { mkdirs() }
-        activeProcessId = id
+        val folder = Workspaces.create(context, id)
+        begin(id)
         val started = System.nanoTime()
 
         try {
@@ -291,7 +325,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 }
             }
 
-            progress(5f, "Preparing segment download...")
+            progress(-1f, "Preparing segment download...")
 
             val req = request(url, allowPlaylist = false)
                 .addOption("--download-sections", sectionArg)
@@ -311,13 +345,13 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 req.addOption("--merge-output-format", outExt)
             }
 
+            checkCancelled()
             engine.execute(req, id) { percent, _, _ ->
-                val p = percent.coerceIn(0f, 100f)
-                val stage = if (p < 80f) "Downloading segment (${p.toInt()}%)" else "Processing & cutting clip (${p.toInt()}%)"
-                progress(p, stage)
+                val p = if (percent.isFinite() && percent >= 0) percent.coerceAtMost(100f) else -1f
+                progress(p, "Downloading segment")
             }
-
-            progress(92f, "Finalizing & saving clip...")
+            checkCancelled()
+            progress(-1f, "Validating & saving clip...")
 
             val output = folder.listFiles()?.singleOrNull { it.isFile && it.extension in setOf("mp4", "webm", "mkv", "mp3", "m4a", "mov") }
                 ?: folder.listFiles()?.firstOrNull { it.isFile && it.extension in setOf("mp4", "webm", "mkv", "mp3", "m4a", "mov") }
@@ -333,6 +367,8 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             }
             val qualityTag = if (clip.isAudioOnly) "audio" else "${clip.height}p"
             val displayBase = "${safeTitle}_${formatCompact(clip.startSeconds)}-${formatCompact(clip.endSeconds)}_${qualityTag}"
+            validateOutput(output, if (clip.isAudioOnly) ProbeAction.MP3 else ProbeAction.VIDEO)
+            beginPublishing()
             val savedUri = publishWithName(output, if (clip.isAudioOnly) ProbeAction.MP3 else ProbeAction.CLIP, displayBase)
 
             progress(100f, "Clip Ready ✓")
@@ -347,7 +383,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             )
         } finally {
             if (activeProcessId == id) activeProcessId = null
-            folder.deleteRecursively()
+            Workspaces.release(folder)
         }
     }
 
@@ -355,14 +391,14 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         if (StatFs(context.noBackupFilesDir.path).availableBytes < 512L * 1024 * 1024)
             throw ProbeFailure(Problem.SPACE)
         val id = UUID.randomUUID().toString()
-        val folder = File(workRoot, id).apply { mkdirs() }
-        activeProcessId = id
+        val folder = Workspaces.create(context, id)
+        begin(id)
         val started = System.nanoTime()
         try {
             val req = request(url, allowPlaylist = true)
                 .addOption("--no-simulate")
                 .addOption("--newline")
-                .addOption("--output", File(folder, "%(playlist_index)s-%(title).40s.%(ext)s").absolutePath)
+                .addOption("--output", File(folder, "%(playlist_index)05d-%(title).80s.%(ext)s").absolutePath)
                 .addOption("--max-filesize", "512M")
 
             if (action == ProbeAction.MP3 || action == ProbeAction.PLAYLIST_MP3) {
@@ -374,7 +410,9 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                     .addOption("--merge-output-format", "mkv")
             }
 
-            engine.execute(req, id) { percent, _, _ -> progress(percent.coerceIn(0f, 100f)) }
+            checkCancelled()
+            engine.execute(req, id) { _, _, _ -> progress(-1f) }
+            checkCancelled()
             val outputs = folder.listFiles()?.filter { it.isFile && it.extension in setOf("mp4", "webm", "mkv", "mp3", "m4a", "mov") }?.sortedBy { it.name }
                 ?: emptyList()
             if (outputs.isEmpty()) throw ProbeFailure(Problem.CONVERSION, "No playlist items downloaded")
@@ -383,6 +421,8 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             if (outputs.any { it.length() > 512L * 1024 * 1024 }) {
                 throw ProbeFailure(Problem.SPACE, "Playlist output exceeds the 512 MB per-file limit")
             }
+            outputs.forEach { validateOutput(it, if (action in setOf(ProbeAction.MP3, ProbeAction.PLAYLIST_MP3)) ProbeAction.MP3 else ProbeAction.VIDEO) }
+            beginPublishing()
             val publishedUris = mutableListOf<String>()
             try {
                 outputs.forEach { publishedUris.add(publish(it, action)) }
@@ -396,7 +436,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             return ProbeResult(action, (System.nanoTime() - started) / 1_000_000, totalBytes, publishedUris.firstOrNull(), true, detail, publishedUris.toList())
         } finally {
             if (activeProcessId == id) activeProcessId = null
-            folder.deleteRecursively()
+            Workspaces.release(folder)
         }
     }
 
@@ -437,7 +477,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             val finalized = resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
             if (finalized <= 0) throw ProbeFailure(Problem.CONVERSION, "Unable to finalize saved media")
             return uri.toString()
-        } catch (e: Exception) { resolver.delete(uri, null, null); throw e }
+        } catch (e: Exception) { runCatching { resolver.delete(uri, null, null) }; throw e }
     }
 
     fun publishWithName(file: File, action: ProbeAction, baseName: String): String {
@@ -445,8 +485,8 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             "mp3" -> "audio/mpeg"; "mp4" -> "video/mp4"; "webm" -> "video/webm"
             "mkv" -> "video/x-matroska"; "m4a" -> "audio/mp4"; else -> "video/quicktime"
         }
-        val cleanBase = baseName.take(60).replace(Regex("[^a-zA-Z0-9._-]"), "_").trim('_')
-        val displayName = "${cleanBase}-${System.currentTimeMillis() % 10000}.${file.extension}"
+        val cleanBase = org.videopocket.probe.storage.FileNamingEngine.sanitize(baseName).take(100)
+        val displayName = "${cleanBase}-${UUID.randomUUID().toString().take(8)}.${file.extension}"
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, displayName)
             put(MediaStore.Downloads.MIME_TYPE, mime)
@@ -460,7 +500,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             val finalized = resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
             if (finalized <= 0) throw ProbeFailure(Problem.CONVERSION, "Unable to finalize saved media")
             return uri.toString()
-        } catch (e: Exception) { resolver.delete(uri, null, null); throw e }
+        } catch (e: Exception) { runCatching { resolver.delete(uri, null, null) }; throw e }
     }
 
     companion object {

@@ -71,200 +71,132 @@ data class DownloadTask(
 
 class DownloadQueueManager(
     private val application: Application,
-    private val engine: ProbeEngine
+    @Suppress("UNUSED_PARAMETER") engine: ProbeEngine
 ) {
-    private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val scope = CoroutineScope(Dispatchers.Main.immediate + SupervisorJob())
     private val activeJobs = mutableMapOf<String, Job>()
-
+    private val engines = mutableMapOf<String, ProbeEngine>()
+    private var closed = false
+    private var concurrency by mutableStateOf(AppSettings.maxConcurrentDownloads)
     var tasks by mutableStateOf(listOf<DownloadTask>())
         private set
+    var maxConcurrent: Int
+        get() = concurrency
+        set(value) { concurrency = value.coerceIn(1, 4); processNext() }
 
-    var maxConcurrent by mutableStateOf(AppSettings.maxConcurrentDownloads)
-
-    val activeTasks: List<DownloadTask>
-        get() = tasks.filter { it.state == DownloadState.DOWNLOADING || it.state == DownloadState.MERGING || it.state == DownloadState.SAVING || it.state == DownloadState.RESOLVING }
-
-    val queuedTasks: List<DownloadTask>
-        get() = tasks.filter { it.state == DownloadState.QUEUED || it.state == DownloadState.PAUSED }
-
-    val completedTasks: List<DownloadTask>
-        get() = tasks.filter { it.state == DownloadState.COMPLETED }
-
-    val failedTasks: List<DownloadTask>
-        get() = tasks.filter { it.state == DownloadState.FAILED || it.state == DownloadState.CANCELLED }
+    val activeTasks get() = tasks.filter { it.state in ACTIVE_STATES }
+    val queuedTasks get() = tasks.filter { it.state in setOf(DownloadState.QUEUED, DownloadState.PAUSED) }
+    val completedTasks get() = tasks.filter { it.state == DownloadState.COMPLETED }
+    val failedTasks get() = tasks.filter { it.state in setOf(DownloadState.FAILED, DownloadState.CANCELLED) }
 
     fun enqueue(task: DownloadTask) {
-        tasks = listOf(task) + tasks
+        if (closed || tasks.any { it.id == task.id }) return
+        val validated = try { task.copy(url = LinkPolicy.validate(task.url)) }
+        catch (_: Exception) { task.copy(state = DownloadState.FAILED, error = Problem.INVALID_URL.name) }
+        tasks = listOf(validated) + tasks
         processNext()
     }
 
+    // Active transfer resume is not supported by the engine. Only waiting tasks can pause.
     fun pause(taskId: String) {
-        activeJobs[taskId]?.cancel()
-        activeJobs.remove(taskId)
-        updateTask(taskId) {
-            it.copy(state = DownloadState.PAUSED)
-        }
-        processNext()
+        updateTask(taskId) { if (it.state == DownloadState.QUEUED) it.copy(state = DownloadState.PAUSED) else it }
     }
-
     fun resume(taskId: String) {
-        updateTask(taskId) {
-            it.copy(state = DownloadState.QUEUED)
-        }
+        updateTask(taskId) { if (it.state == DownloadState.PAUSED) it.copy(state = DownloadState.QUEUED) else it }
         processNext()
     }
-
     fun cancel(taskId: String) {
-        activeJobs[taskId]?.cancel()
-        activeJobs.remove(taskId)
-        engine.cancelCurrent()
-        PocketNotifier.dismiss(application)
-        updateTask(taskId) {
-            it.copy(state = DownloadState.CANCELLED)
-        }
+        val task = tasks.firstOrNull { it.id == taskId } ?: return
+        if (task.state in setOf(DownloadState.COMPLETED, DownloadState.FAILED, DownloadState.CANCELLED)) return
+        val engine = engines[taskId]
+        if (engine != null && !engine.cancelCurrent() && task.state != DownloadState.RESOLVING) return
+        updateTask(taskId) { it.copy(state = DownloadState.CANCELLED, speedText = "", etaText = "") }
+        PocketNotifier.dismiss(application, taskId.hashCode())
+        // Keep the slot until the blocking process exits and its files are cleaned up.
         processNext()
     }
-
     fun retry(taskId: String) {
+        if (activeJobs.containsKey(taskId)) return
         updateTask(taskId) {
-            it.copy(state = DownloadState.QUEUED, progress = 0f, error = null)
+            if (it.state in setOf(DownloadState.FAILED, DownloadState.CANCELLED))
+                it.copy(state = DownloadState.QUEUED, rawInfo = null, progress = -1f, error = null, outputUri = null, bytes = 0)
+            else it
         }
         processNext()
     }
-
     fun removeTask(taskId: String) {
         cancel(taskId)
-        tasks = tasks.filter { it.id != taskId }
+        if (!activeJobs.containsKey(taskId)) tasks = tasks.filterNot { it.id == taskId }
     }
-
-    fun clearCompleted() {
-        tasks = tasks.filter { it.state != DownloadState.COMPLETED }
+    fun clearCompleted() { tasks = tasks.filterNot { it.state == DownloadState.COMPLETED } }
+    fun close() {
+        closed = true
+        engines.values.forEach { it.cancelCurrent() }
+        scope.cancel()
     }
-
     private fun updateTask(id: String, transform: (DownloadTask) -> DownloadTask) {
         tasks = tasks.map { if (it.id == id) transform(it) else it }
     }
-
     private fun processNext() {
-        if (activeTasks.size >= maxConcurrent) return
-        val next = queuedTasks.firstOrNull { it.state == DownloadState.QUEUED } ?: return
-
-        updateTask(next.id) { it.copy(state = DownloadState.DOWNLOADING) }
-
-        val job = scope.launch {
-            runTask(next)
+        if (closed) return
+        while (activeJobs.size < maxConcurrent) {
+            val next = tasks.asReversed().firstOrNull { it.state == DownloadState.QUEUED } ?: break
+            val engine = ProbeEngine(application)
+            engines[next.id] = engine
+            updateTask(next.id) { it.copy(state = DownloadState.RESOLVING, progress = -1f) }
+            val job = scope.launch(start = CoroutineStart.LAZY) { runTask(next, engine) }
+            activeJobs[next.id] = job
+            job.start()
         }
-        activeJobs[next.id] = job
     }
-
-    private suspend fun runTask(task: DownloadTask) {
-        var lastTime = System.currentTimeMillis()
-        var lastBytes = 0L
-
+    private suspend fun runTask(task: DownloadTask, engine: ProbeEngine) {
+        fun cancelled() = tasks.firstOrNull { it.id == task.id }?.state == DownloadState.CANCELLED
         try {
-            val mediaInfo = task.rawInfo ?: withContext(Dispatchers.IO) {
-                engine.inspect(task.url)
-            }
-
-            val result: ProbeResult = withContext(Dispatchers.IO) {
-                if (task.isClip && task.clipRequest != null) {
-                    engine.downloadClip(task.url, mediaInfo, task.clipRequest) { p, stage ->
-                        val now = System.currentTimeMillis()
-                        val speedStr = calculateSpeed(p, now - lastTime)
-                        updateTask(task.id) {
-                            it.copy(
-                                progress = p,
-                                speedText = speedStr,
-                                state = if (p >= 85f) DownloadState.TRANSCODING else DownloadState.DOWNLOADING
-                            )
-                        }
-                        PocketNotifier.showProgress(
-                            application,
-                            percent = p.toInt(),
-                            stageText = stage,
-                            title = task.title
-                        )
-                    }
-                } else {
-                    val action = when {
-                        task.isAudioOnly -> ProbeAction.MP3
-                        mediaInfo.isPlaylist -> ProbeAction.PLAYLIST_VIDEO
-                        else -> ProbeAction.VIDEO
-                    }
-                    engine.download(task.url, mediaInfo, action, task.height, task.bitrate) { p ->
-                        val now = System.currentTimeMillis()
-                        val speedStr = calculateSpeed(p, now - lastTime)
-                        updateTask(task.id) {
-                            it.copy(
-                                progress = p,
-                                speedText = speedStr,
-                                state = if (p >= 90f) DownloadState.SAVING else DownloadState.DOWNLOADING
-                            )
-                        }
-                        PocketNotifier.showProgress(
-                            application,
-                            percent = p.toInt(),
-                            stageText = "Downloading (${p.toInt()}%)",
-                            title = task.title
-                        )
+            val media = task.rawInfo ?: withContext(Dispatchers.IO) { engine.inspect(task.url) }
+            if (cancelled()) throw ProbeFailure(Problem.CANCELED)
+            updateTask(task.id) { it.copy(state = DownloadState.DOWNLOADING) }
+            val progress: (Float) -> Unit = { percent ->
+                scope.launch {
+                    if (!cancelled()) {
+                        updateTask(task.id) { it.copy(progress = percent, speedText = "", etaText = "") }
+                        PocketNotifier.showProgress(application, task.id.hashCode(), task.title, percent.toInt(),
+                            if (AppSettings.isArabic) "تنزيل ومعالجة" else "Downloading and processing")
                     }
                 }
             }
-
-            // Successfully downloaded
-            updateTask(task.id) {
-                it.copy(
-                    state = DownloadState.COMPLETED,
-                    progress = 100f,
-                    outputUri = result.outputUri,
-                    bytes = result.bytes,
-                    speedText = ""
-                )
+            // Finish indexing after publication even if the owning screen is destroyed.
+            val result = withContext(Dispatchers.IO + NonCancellable) {
+                if (cancelled()) throw ProbeFailure(Problem.CANCELED)
+                val downloaded = if (task.isClip && task.clipRequest != null) {
+                    engine.downloadClip(task.url, media, task.clipRequest) { p, _ -> progress(p) }
+                } else {
+                    val action = when {
+                        task.isAudioOnly && media.isPlaylist -> ProbeAction.PLAYLIST_MP3
+                        task.isAudioOnly -> ProbeAction.MP3
+                        media.isPlaylist -> ProbeAction.PLAYLIST_VIDEO
+                        else -> ProbeAction.VIDEO
+                    }
+                    engine.download(task.url, media, action, task.height, task.bitrate, progress)
+                }
+                check(downloaded.passed && !downloaded.outputUri.isNullOrBlank())
+                LibraryIndexer.index(application, downloaded, media, task.url, task.platform, task.clipRequest)
+                downloaded
             }
-
-            // Save to Library
-            val libraryItem = PocketLibraryItem(
-                id = UUID.randomUUID().toString(),
-                title = task.title,
-                uriString = result.outputUri ?: "",
-                isClip = task.isClip,
-                clipRange = task.clipRequest?.let { "${it.startFormatted()} → ${it.endFormatted()}" },
-                duration = if (task.isClip && task.clipRequest != null) task.clipRequest.durationFormatted()
-                else mediaInfo.duration?.let { ClipRequest.formatSeconds(it) } ?: "Full",
-                resolution = if (task.isAudioOnly) "MP3 Audio" else "${task.height}p",
-                format = if (task.isAudioOnly) "MP3" else task.format.uppercase(),
-                fileSizeBytes = result.bytes,
-                createdAt = System.currentTimeMillis(),
-                thumbnailUri = mediaInfo.thumbnailUrl,
-                platform = task.platform,
-                sourceMediaId = mediaInfo.id,
-                sourceUrl = task.url
-            )
-            PocketLibraryManager.addItem(application, libraryItem)
-
-            PocketNotifier.showSuccess(
-                application,
-                title = "Download Complete ✓",
-                message = task.title,
-                uriString = result.outputUri
-            )
-
-        } catch (e: Exception) {
-            val prob = ProbeEngine.classify(e)
-            updateTask(task.id) {
-                it.copy(
-                    state = DownloadState.FAILED,
-                    error = prob.name
-                )
-            }
-            PocketNotifier.dismiss(application)
+            updateTask(task.id) { it.copy(state = DownloadState.COMPLETED, progress = 100f, outputUri = result.outputUri, bytes = result.bytes) }
+            PocketNotifier.showSuccess(application, task.id.hashCode(),
+                if (AppSettings.isArabic) "اكتمل التنزيل" else "Download complete", task.title, result.outputUri)
+        } catch (failure: Exception) {
+            val problem = ProbeEngine.classify(failure)
+            updateTask(task.id) { it.copy(state = if (cancelled() || problem == Problem.CANCELED || failure is CancellationException)
+                DownloadState.CANCELLED else DownloadState.FAILED, error = problem.name) }
+            PocketNotifier.dismiss(application, task.id.hashCode())
         } finally {
+            engines.remove(task.id)
             activeJobs.remove(task.id)
             processNext()
         }
     }
-
-    private fun calculateSpeed(progress: Float, elapsedMs: Long): String {
-        return if (progress in 1f..99f) "Active" else ""
+    companion object {
+        val ACTIVE_STATES = setOf(DownloadState.RESOLVING, DownloadState.DOWNLOADING, DownloadState.MERGING, DownloadState.TRANSCODING, DownloadState.SAVING)
     }
 }

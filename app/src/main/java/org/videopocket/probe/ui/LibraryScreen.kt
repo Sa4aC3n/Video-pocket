@@ -33,7 +33,8 @@ import java.util.*
 fun LibraryScreen(
     model: ProbeModel,
     arabic: Boolean,
-    onNavigateHome: () -> Unit
+    onNavigateHome: () -> Unit,
+    onProcess: (PocketLibraryItem) -> Unit
 ) {
     val context = LocalContext.current
     fun t(en: String, ar: String) = if (arabic) ar else en
@@ -207,7 +208,8 @@ fun LibraryScreen(
                             model.refreshLibrary()
                         },
                         onRename = { renameItemTarget = item },
-                        onDelete = { deleteItemTarget = item }
+                        onDelete = { deleteItemTarget = item },
+                        onProcess = { onProcess(item) }
                     )
                 }
             }
@@ -344,7 +346,8 @@ fun PocketItemCard(
     onShare: () -> Unit,
     onToggleFavorite: () -> Unit,
     onRename: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onProcess: () -> Unit
 ) {
     fun t(en: String, ar: String) = if (arabic) ar else en
     var expandedMenu by remember { mutableStateOf(false) }
@@ -501,6 +504,11 @@ fun PocketItemCard(
                             expanded = expandedMenu,
                             onDismissRequest = { expandedMenu = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text(t("Compress / edit", "ضغط / تعديل")) },
+                                leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
+                                onClick = { expandedMenu = false; onProcess() }
+                            )
                             DropdownMenuItem(
                                 text = { Text(t("Rename", "إعادة تسمية")) },
                                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },

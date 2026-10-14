@@ -459,7 +459,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
     private fun publish(file: File, action: ProbeAction): String {
         val mime = when (file.extension) {
             "mp3" -> "audio/mpeg"; "mp4" -> "video/mp4"; "webm" -> "video/webm"
-            "mkv" -> "video/x-matroska"; "m4a" -> "audio/mp4"; else -> "video/quicktime"
+            "mkv" -> "video/x-matroska"; "m4a" -> "audio/mp4"; "wav" -> "audio/wav"; else -> "video/quicktime"
         }
         val safeName = file.nameWithoutExtension.take(40).replace(Regex("[^a-zA-Z0-9._-]"), "_")
         val displayName = if (safeName.isNotBlank()) "${safeName}-${System.currentTimeMillis()}.${file.extension}"
@@ -483,7 +483,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
     fun publishWithName(file: File, action: ProbeAction, baseName: String): String {
         val mime = when (file.extension) {
             "mp3" -> "audio/mpeg"; "mp4" -> "video/mp4"; "webm" -> "video/webm"
-            "mkv" -> "video/x-matroska"; "m4a" -> "audio/mp4"; else -> "video/quicktime"
+            "mkv" -> "video/x-matroska"; "m4a" -> "audio/mp4"; "wav" -> "audio/wav"; else -> "video/quicktime"
         }
         val cleanBase = org.videopocket.probe.storage.FileNamingEngine.sanitize(baseName).take(100)
         val displayName = "${cleanBase}-${UUID.randomUUID().toString().take(8)}.${file.extension}"

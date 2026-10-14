@@ -374,6 +374,8 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
 @Composable
 fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    var processingUri by rememberSaveable { mutableStateOf<String?>(null) }
+    var processingTitle by rememberSaveable { mutableStateOf<String?>(null) }
     var arabic by rememberSaveable { mutableStateOf(AppSettings.isArabic) }
     fun t(en: String, ar: String) = if (arabic) ar else en
 
@@ -420,6 +422,12 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                         onClick = { selectedTab = 2 }
                     )
                     NavigationBarItem(
+                        icon = { Icon(Icons.Default.Tune, contentDescription = t("Media Studio", "استوديو الوسائط")) },
+                        label = { Text(t("Studio", "استوديو")) },
+                        selected = selectedTab == 4,
+                        onClick = { selectedTab = 4 }
+                    )
+                    NavigationBarItem(
                         icon = { Icon(Icons.Default.Settings, contentDescription = t("Settings", "الإعدادات")) },
                         label = { Text(t("Settings", "الإعدادات")) },
                         selected = selectedTab == 3,
@@ -443,7 +451,10 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                         onNavigatePocket = { selectedTab = 2 }
                     )
                     1 -> DownloadsScreen(model = model, arabic = arabic)
-                    2 -> LibraryScreen(model = model, arabic = arabic, onNavigateHome = { selectedTab = 0 })
+                    2 -> LibraryScreen(model = model, arabic = arabic, onNavigateHome = { selectedTab = 0 }, onProcess = {
+                        processingUri = it.uriString; processingTitle = it.title; selectedTab = 4
+                    })
+                    4 -> ProcessingScreen(arabic, processingUri, processingTitle)
                     3 -> SettingsScreen(
                         model = model,
                         arabic = arabic,

@@ -30,3 +30,16 @@ All updates are incremental fast-forwards on main. Existing binary resources and
 ## Remaining work
 
 Phases 5–8 implementation, final Gradle/lint/regression results, device media tests, release signing and release readiness remain open. No production-readiness claim is made.
+
+## Phases 5–6 implementation milestone
+
+- Phase 4 commit: `96e488278349f0301ffec54f17a06f85cfcbf382`, verified on GitHub main and against the local Git tree.
+- Added Media Studio with Android document picker and library editing entry point: compress, trim with explicit start/end, extract audio, convert.
+- Existing bundled FFmpeg runs locally with argument arrays, no shell, no network input and no paid service. Initialization remains deferred until Studio is opened.
+- Encoder availability is based on `-encoders`, muxer enumeration and successful sample encoding on the device. Capability results are process-local and cached. Adaptive software codec selection uses H.264 / HEVC; WebM uses VP9 + Opus when verified. No unsupported AVI/WMV options are exposed.
+- Three presets preserve aspect ratio, even output dimensions, and never upscale. Optional compression size cap uses a bitrate budget with bounded second attempt and verifies final size. Larger-than-original compression output is not published.
+- Actual FFmpeg output timestamps drive progress; import, validation and save phases are indeterminate. Cancellation kills the owned subprocess and removes only the new scratch output. Once atomic publication starts cancellation is disabled.
+- Original URI is opened read-only. New output is validated for track type/duration, stored through pending MediaStore rows, and indexed. Index failure rolls back only the newly published output.
+- Reject protected inputs and HDR conversions rather than silently altering HDR colors. Processing has a one-hour timeout, bounded threads, bounded diagnostics, and storage checks during copying/encoding.
+- Added policy regression tests for capabilities, bitrate budget, trimming, dimensions and progress. Compilation/runtime results pending CI; these are implementation claims only.
+- CI run 38508890686 failed before Gradle because `sdkmanager` was not on PATH. Android setup action is now restored with explicit supported packages (its obsolete default `tools` package is excluded).

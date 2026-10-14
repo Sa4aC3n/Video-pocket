@@ -380,7 +380,15 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             if (outputs.isEmpty()) throw ProbeFailure(Problem.CONVERSION, "No playlist items downloaded")
             if (outputs.any { it.length() <= 0L }) throw ProbeFailure(Problem.CONVERSION, "Playlist contains an empty output file")
             val totalBytes = outputs.sumOf { it.length() }
-            val publishedUris = outputs.map { publish(it, action) }
+            val publishedUris = mutableListOf<String>()
+            try {
+                outputs.forEach { publishedUris.add(publish(it, action)) }
+            } catch (failure: Exception) {
+                publishedUris.forEach { publishedUri ->
+                    runCatching { context.contentResolver.delete(android.net.Uri.parse(publishedUri), null, null) }
+                }
+                throw failure
+            }
             val detail = "${outputs.size} playlist items saved (${totalBytes / 1024} KB)"
             return ProbeResult(action, (System.nanoTime() - started) / 1_000_000, totalBytes, publishedUris.firstOrNull(), true, detail)
         } finally {

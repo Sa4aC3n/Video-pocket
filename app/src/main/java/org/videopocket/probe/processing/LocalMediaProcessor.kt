@@ -54,7 +54,7 @@ class LocalMediaProcessor(private val context: Context) {
         val timedOut = AtomicBoolean(false)
         val noSpace = AtomicBoolean(false)
         val deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(timeoutSeconds)
-        val watchdog = WATCHDOG.scheduleAtFixedRate({
+        val watchdog = WATCHDOG.scheduleWithFixedDelay({
             if (System.nanoTime() > deadline) { timedOut.set(true); child.destroyForcibly() }
             if (runCatching { StatFs(directory.path).availableBytes < RESERVE }.getOrDefault(false)) {
                 noSpace.set(true); child.destroyForcibly()

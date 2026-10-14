@@ -119,7 +119,10 @@ class DownloadQueueManager(
     val failedTasks get() = tasks.filter { it.state in setOf(DownloadState.FAILED, DownloadState.CANCELLED) }
 
     fun enqueue(task: DownloadTask) {
-        if (closed || tasks.any { it.id == task.id }) return
+        if (closed || tasks.any { it.id == task.id ||
+            it.state in ACTIVE_STATES + setOf(DownloadState.QUEUED, DownloadState.PAUSED) &&
+            it.url == task.url && it.height == task.height && it.format == task.format &&
+            it.isAudioOnly == task.isAudioOnly && it.clipRequest == task.clipRequest }) return
         val validated = try { task.copy(url = LinkPolicy.validate(task.url)) }
         catch (_: Exception) { task.copy(state = DownloadState.FAILED, error = Problem.INVALID_URL.name) }
         tasks = listOf(validated) + tasks

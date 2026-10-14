@@ -220,7 +220,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
                 when (resolveRes) {
                     is MediaResolverResult.Success -> {
                         normalizedMetadata = resolveRes.metadata
-                        info = resolveRes.metadata.rawInfo ?: withContext(Dispatchers.IO) { engine.inspect(valid, forcePlaylist) }
+                        info = if (forcePlaylist) withContext(Dispatchers.IO) { engine.inspect(valid, true) } else resolveRes.metadata.rawInfo ?: withContext(Dispatchers.IO) { engine.inspect(valid) }
                         inspectedUrl = valid
                         val detailMsg = if (info!!.isPlaylist) "Playlist inspected; entries=${info!!.playlistCount}" else "Metadata extracted; formats=${info!!.formats.size}"
                         record(ProbeResult(ProbeAction.INSPECT, (System.nanoTime() - started) / 1_000_000, 0, null, true, detailMsg))
@@ -254,93 +254,25 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun run(action: ProbeAction, height: Int, bitrate: Int, outputFormat: String = AppSettings.defaultVideoFormat) {
-        if (busy || !ready) return
+        if (busy) return
         val media = info ?: return
         val url = inspectedUrl ?: return
-        busy = true
-        problem = null
-        progress = 0f
-        currentStageText = "Downloading..."
-        PocketNotifier.showProgress(getApplication(), percent = 0, stageText = currentStageText, title = media.title)
-
-        viewModelScope.launch {
-            val started = System.nanoTime()
-            try {
-                val result = withContext(Dispatchers.IO) {
-                    engine.downloadWithFormat(url, media, action, height, bitrate, outputFormat) { p ->
-                        val pInt = p.toInt()
-                        viewModelScope.launch(Dispatchers.Main.immediate) {
-                            progress = p
-                            currentStageText = if (p < 0) "Processing & saving…" else "Downloading ($pInt%)"
-                        }
-                        PocketNotifier.showProgress(getApplication(), percent = pInt, stageText = "Downloading ($pInt%)", title = media.title)
-                    }
-                }
-                record(result)
-                if (!result.passed || result.outputUri.isNullOrBlank()) {
-                    problem = Problem.ENGINE
-                    PocketNotifier.dismiss(getApplication())
-                    return@launch
-                }
-                withContext(Dispatchers.IO + NonCancellable) {
-                    LibraryIndexer.index(getApplication(), result, media, url, normalizedMetadata?.platform)
-                }
-                refreshLibrary()
-                PocketNotifier.showSuccess(getApplication(), title = "Download Complete ✓", message = media.title, uriString = result.outputUri)
-            } catch (e: Exception) {
-                problem = ProbeEngine.classify(e)
-                PocketNotifier.dismiss(getApplication())
-                record(ProbeResult(action, (System.nanoTime() - started) / 1_000_000, 0, null, false, problem!!.name))
-            } finally {
-                busy = false
-                currentStageText = ""
-            }
-        }
+        val audio = action in setOf(ProbeAction.MP3, ProbeAction.PLAYLIST_MP3)
+        queueManager.enqueue(DownloadTask(url = url, title = media.title,
+            platform = normalizedMetadata?.platform ?: media.extractor.orEmpty(),
+            quality = if (audio) "${bitrate} kbps output" else if (height > 0) "${height}p" else "Source quality",
+            format = outputFormat, height = height, bitrate = bitrate, isAudioOnly = audio, rawInfo = media))
     }
 
     fun runClip(clip: ClipRequest) {
-        if (busy || !ready) return
+        if (busy) return
         val media = info ?: return
         val url = inspectedUrl ?: return
-        busy = true
-        problem = null
-        progress = 0f
-        currentStageText = "Preparing clip download..."
-        PocketNotifier.showProgress(getApplication(), percent = 0, stageText = currentStageText, title = media.title)
-
-        viewModelScope.launch {
-            val started = System.nanoTime()
-            try {
-                val result = withContext(Dispatchers.IO) {
-                    engine.downloadClip(url, media, clip) { p, stage ->
-                        val pInt = p.toInt()
-                        viewModelScope.launch(Dispatchers.Main.immediate) {
-                            progress = p
-                            currentStageText = stage
-                        }
-                        PocketNotifier.showProgress(getApplication(), percent = pInt, stageText = stage, title = media.title)
-                    }
-                }
-                record(result)
-                if (!result.passed || result.outputUri.isNullOrBlank()) {
-                    problem = Problem.ENGINE
-                    PocketNotifier.dismiss(getApplication())
-                    return@launch
-                }
-                withContext(Dispatchers.IO + NonCancellable) {
-                    LibraryIndexer.index(getApplication(), result, media, url, normalizedMetadata?.platform, clip)
-                }
-                refreshLibrary()
-                PocketNotifier.showSuccess(getApplication(), title = "Clip Ready ✓", message = "${media.title} (${clip.durationFormatted()})", uriString = result.outputUri)
-            } catch (e: Exception) {
-                problem = ProbeEngine.classify(e)
-                PocketNotifier.dismiss(getApplication())
-                record(ProbeResult(ProbeAction.CLIP, (System.nanoTime() - started) / 1_000_000, 0, null, false, problem!!.name))
-            } finally {
-                busy = false
-                currentStageText = ""
-            }
-        }
+        queueManager.enqueue(DownloadTask(url = url, title = media.title,
+            platform = normalizedMetadata?.platform ?: media.extractor.orEmpty(),
+            quality = if (clip.isAudioOnly) "Audio" else if (clip.height > 0) "${clip.height}p" else "Source quality",
+            format = clip.format, height = clip.height, isAudioOnly = clip.isAudioOnly,
+            isClip = true, clipRequest = clip, rawInfo = media))
     }
 
     private suspend fun record(result: ProbeResult) {
@@ -351,7 +283,8 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
 
     fun report(): String = JSONObject().put("app", "VideoPocket 2.0")
         .put("generatedAt", Instant.now().toString()).put("runtime", runtime)
-        .put("scope", "Foreground V2 experience; secure downloads and media management")
+        .put("scope", "Foreground downloads, persistent queue and local media processing")
+        .put("queue", JSONArray(queueManager.tasks.map { JSONObject().put("state", it.state.name).put("bytes", it.bytes).put("error", it.error ?: "") }))
         .put("results", JSONArray(results.map { r ->
             JSONObject()
                 .put("action", r.action.name)

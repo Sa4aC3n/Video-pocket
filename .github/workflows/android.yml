@@ -27,8 +27,8 @@ jobs:
           packages: platform-tools platforms;android-35 build-tools;35.0.0
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
-      - name: Unit tests, debug APK, and Android lint
-        run: bash gradlew testDebugUnitTest assembleDebug lintDebug --continue --stacktrace --console=plain
+      - name: Unit tests, application and test APKs, and Android lint
+        run: bash gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug --continue --stacktrace --console=plain
       - name: Verification evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -62,6 +62,9 @@ jobs:
         with:
           api-level: 29
           arch: x86_64
+          disk-size: 2048M
+          ram-size: 2048M
+          emulator-boot-timeout: 300
           disable-animations: true
           script: bash gradlew connectedDebugAndroidTest --stacktrace --console=plain
       - uses: actions/upload-artifact@v4

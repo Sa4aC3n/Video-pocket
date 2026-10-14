@@ -187,7 +187,7 @@ data class NormalizedMetadata(
         .distinct()
         .sortedDescending()
 
-    val defaultHeight: Int get() = heights.firstOrNull { it <= 1080 } ?: heights.minOrNull() ?: 1080
+    val defaultHeight: Int get() = heights.firstOrNull { it <= 1080 } ?: heights.minOrNull() ?: 0
 
     val audioVariants: List<MediaVariant> get() = variants.filter { it.isAudioOnly }
 

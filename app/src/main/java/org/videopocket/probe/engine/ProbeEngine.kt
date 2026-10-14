@@ -104,7 +104,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                     Os.setenv("PYTHONHOME", pythonHome, true)
                 } catch (_: Throwable) {}
 
-                val ver = "2026.08.19"
+                val ver = engine.version(context) ?: "Unknown"
                 val result = JSONObject().put("androidApi", Build.VERSION.SDK_INT)
                     .put("supportedAbis", Build.SUPPORTED_ABIS.joinToString(","))
                     .put("pageSize", Os.sysconf(OsConstants._SC_PAGESIZE))

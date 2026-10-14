@@ -45,7 +45,6 @@ fun HomeScreen(
     fun t(en: String, ar: String) = if (arabic) ar else en
 
     var url by rememberSaveable { mutableStateOf(sharedIntent) }
-    LaunchedEffect(sharedIntent) { if (sharedIntent.isNotBlank()) url = sharedIntent }
     var playlistMode by rememberSaveable { mutableStateOf(false) }
     var selectedHeight by remember { mutableIntStateOf(1080) }
     var selectedBitrate by remember { mutableIntStateOf(192) }
@@ -561,7 +560,7 @@ fun HomeScreen(
 
                     // Media Studio Tabs: Video, Audio, Clip
                     var mediaTab by rememberSaveable(media.title) { mutableIntStateOf(0) }
-                    val totalDur = media.duration ?: 60.0
+                    val totalDur = media.duration?.takeIf { it.isFinite() && it > 0 } ?: 0.0
 
                     var clipStart by remember(media.title) { mutableDoubleStateOf(0.0) }
                     var clipEnd by remember(media.title) {
@@ -689,8 +688,9 @@ fun HomeScreen(
                             }
                         }
                         2 -> {
-                            // CLIP TAB
-                            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                            // Clip controls require an actual duration.
+                            if (totalDur <= 0) Text(t("Duration unavailable; use Media Studio after downloading.", "المدة غير متاحة؛ استخدم الاستوديو بعد التنزيل."))
+                            else Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
                                 DualHandleTimeline(
                                     totalDuration = totalDur,
                                     startSeconds = clipStart,

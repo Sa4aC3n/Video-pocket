@@ -588,7 +588,7 @@ fun QualitySelectionSection(
                 label = { Text(t("✨ Best Available", "✨ أفضل جودة متاحة")) }
             )
 
-            val heightsToShow = if (availableHeights.isNotEmpty()) availableHeights else listOf(1080, 720, 480, 360)
+            val heightsToShow = availableHeights.filter { it > 0 }.distinct().sortedDescending()
             heightsToShow.forEach { h ->
                 val tier = QualityTier.fromHeight(h)
                 FilterChip(
@@ -653,27 +653,8 @@ fun ClipSummaryCard(
     fun t(en: String, ar: String) = if (arabic) ar else en
     val tier = QualityTier.fromHeight(clip.height)
 
-    // Calculate estimated size reliably based on clip duration proportion
-    val estSizeMb: String = remember(clip, totalDuration) {
-        val matchingFormat = availableFormats.firstOrNull { it.height == clip.height && it.bytes != null }
-            ?: availableFormats.firstOrNull { it.bytes != null }
-        if (matchingFormat?.bytes != null && totalDuration > 0.0) {
-            val frac = (clip.durationSeconds / totalDuration).coerceIn(0.01, 1.0)
-            val bytes = (matchingFormat.bytes * frac).toLong()
-            "${(bytes / (1024 * 1024)).coerceAtLeast(1)} MB"
-        } else {
-            // Standard estimation: ~10MB per minute for 1080p, ~5MB for 720p, ~2MB for audio
-            val mbPerMin = when {
-                clip.isAudioOnly -> 1.5
-                clip.height >= 1440 -> 25.0
-                clip.height >= 1080 -> 12.0
-                clip.height >= 720 -> 6.0
-                else -> 3.0
-            }
-            val est = ((clip.durationSeconds / 60.0) * mbPerMin).coerceAtLeast(1.0)
-            "≈ ${est.toInt()} MB"
-        }
-    }
+    // Re-encoding and variable bitrate make proportional guesses misleading.
+    val estSizeMb = t("Known after processing", "يُعرف بعد المعالجة")
 
     Card(
         shape = RoundedCornerShape(20.dp),
@@ -701,7 +682,7 @@ fun ClipSummaryCard(
                     color = MaterialTheme.colorScheme.primary
                 ) {
                     Text(
-                        text = if (clip.isAudioOnly) "MP3" else "${clip.height}p • ${tier.category}",
+                        text = if (clip.isAudioOnly) "MP3" else if (clip.height > 0) "${clip.height}p • ${tier.category}" else t("Source quality", "جودة المصدر"),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)

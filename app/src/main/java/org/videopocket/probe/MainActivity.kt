@@ -56,6 +56,31 @@ class MainActivity : ComponentActivity() {
 }
 
 class ProbeModel(application: Application) : AndroidViewModel(application) {
+    private fun detectedOutputFormat(uriString: String): String {
+        return runCatching {
+            val uri = Uri.parse(uriString)
+            val resolver = getApplication<Application>().contentResolver
+            val name = resolver.query(
+                uri, arrayOf(android.provider.OpenableColumns.DISPLAY_NAME),
+                null, null, null
+            )?.use { cursor ->
+                if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+            val extension = name?.substringAfterLast('.', "")?.lowercase()
+            when (extension) {
+                "mp4", "mkv", "webm", "mov", "mp3", "m4a" -> extension.uppercase()
+                else -> when (resolver.getType(uri)) {
+                    "video/mp4" -> "MP4"
+                    "video/x-matroska" -> "MKV"
+                    "video/webm" -> "WEBM"
+                    "audio/mpeg" -> "MP3"
+                    "audio/mp4" -> "M4A"
+                    else -> "Unknown"
+                }
+            }
+        }.getOrDefault("Unknown")
+    }
+
     private val engine = ProbeEngine(application)
     val queueManager = DownloadQueueManager(application, engine)
 
@@ -268,7 +293,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
                     isClip = false,
                     duration = media.duration?.let { ClipRequest.formatSeconds(it) } ?: "Full",
                     resolution = if (isAudio) "MP3 Audio" else "${height}p",
-                    format = if (isAudio) "MP3" else "MKV",
+                    format = detectedOutputFormat(result.outputUri!!),
                     fileSizeBytes = result.bytes,
                     createdAt = System.currentTimeMillis(),
                     thumbnailUri = media.thumbnailUrl,
@@ -328,7 +353,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
                     clipRange = "${clip.startFormatted()} → ${clip.endFormatted()}",
                     duration = clip.durationFormatted(),
                     resolution = if (clip.isAudioOnly) "MP3 Audio" else "${clip.height}p • ${tier.category}",
-                    format = if (clip.isAudioOnly) "MP3" else clip.format.uppercase(),
+                    format = detectedOutputFormat(result.outputUri!!),
                     fileSizeBytes = result.bytes,
                     createdAt = System.currentTimeMillis(),
                     thumbnailUri = media.thumbnailUrl,

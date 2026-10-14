@@ -378,6 +378,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             val outputs = folder.listFiles()?.filter { it.isFile && it.extension in setOf("mp4", "webm", "mkv", "mp3", "m4a", "mov") }?.sortedBy { it.name }
                 ?: emptyList()
             if (outputs.isEmpty()) throw ProbeFailure(Problem.CONVERSION, "No playlist items downloaded")
+            if (outputs.any { it.length() <= 0L }) throw ProbeFailure(Problem.CONVERSION, "Playlist contains an empty output file")
             val totalBytes = outputs.sumOf { it.length() }
             val publishedUris = outputs.map { publish(it, action) }
             val detail = "${outputs.size} playlist items saved (${totalBytes / 1024} KB)"

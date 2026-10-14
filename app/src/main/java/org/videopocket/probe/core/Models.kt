@@ -40,7 +40,7 @@ data class MediaInfo(
     val heights get() = formats.filter { it.video && it.height in 1..2160 }.map { it.height }.distinct().sortedDescending()
     val defaultHeight get() = heights.firstOrNull { it <= 1080 } ?: heights.minOrNull() ?: 1080
 }
-data class ProbeResult(val action: ProbeAction, val elapsedMs: Long, val bytes: Long, val outputUri: String?, val passed: Boolean, val detail: String)
+data class ProbeResult(val action: ProbeAction, val elapsedMs: Long, val bytes: Long, val outputUri: String?, val passed: Boolean, val detail: String, val outputUris: List<String> = emptyList())
 
 enum class QualityTier(val label: String, val category: String) {
     LD_144("144p", "SD"),

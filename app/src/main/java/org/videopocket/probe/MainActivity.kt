@@ -268,7 +268,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
                     isClip = false,
                     duration = media.duration?.let { ClipRequest.formatSeconds(it) } ?: "Full",
                     resolution = if (isAudio) "MP3 Audio" else "${height}p",
-                    format = if (isAudio) "MP3" else "MP4",
+                    format = if (isAudio) "MP3" else "MKV",
                     fileSizeBytes = result.bytes,
                     createdAt = System.currentTimeMillis(),
                     thumbnailUri = media.thumbnailUrl,

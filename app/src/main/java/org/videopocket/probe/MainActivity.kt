@@ -286,22 +286,25 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
                     return@launch
                 }
                 val isAudio = action == ProbeAction.MP3 || action == ProbeAction.PLAYLIST_MP3
-                val item = PocketLibraryItem(
-                    id = UUID.randomUUID().toString(),
-                    title = media.title,
-                    uriString = result.outputUri ?: "",
-                    isClip = false,
-                    duration = media.duration?.let { ClipRequest.formatSeconds(it) } ?: "Full",
-                    resolution = if (isAudio) "MP3 Audio" else "${height}p",
-                    format = detectedOutputFormat(result.outputUri!!),
-                    fileSizeBytes = result.bytes,
-                    createdAt = System.currentTimeMillis(),
-                    thumbnailUri = media.thumbnailUrl,
-                    platform = normalizedMetadata?.platform,
-                    sourceMediaId = normalizedMetadata?.id ?: media.id,
-                    sourceUrl = normalizedMetadata?.canonicalUrl ?: url
-                )
-                PocketLibraryManager.addItem(getApplication(), item)
+                val savedUris = result.outputUris.ifEmpty { listOf(result.outputUri!!) }
+                savedUris.forEachIndexed { index, savedUri ->
+                    val item = PocketLibraryItem(
+                        id = UUID.randomUUID().toString(),
+                        title = if (savedUris.size > 1) "${media.title} (${index + 1}/${savedUris.size})" else media.title,
+                        uriString = savedUri,
+                        isClip = false,
+                        duration = if (savedUris.size > 1) "Full" else media.duration?.let { ClipRequest.formatSeconds(it) } ?: "Full",
+                        resolution = if (isAudio) "MP3 Audio" else "${height}p",
+                        format = detectedOutputFormat(savedUri),
+                        fileSizeBytes = if (savedUris.size == 1) result.bytes else 0L,
+                        createdAt = System.currentTimeMillis(),
+                        thumbnailUri = media.thumbnailUrl,
+                        platform = normalizedMetadata?.platform,
+                        sourceMediaId = if (savedUris.size > 1) null else normalizedMetadata?.id ?: media.id,
+                        sourceUrl = normalizedMetadata?.canonicalUrl ?: url
+                    )
+                    PocketLibraryManager.addItem(getApplication(), item)
+                }
                 refreshLibrary()
                 PocketNotifier.showSuccess(getApplication(), title = "Download Complete ✓", message = media.title, uriString = result.outputUri)
             } catch (e: Exception) {

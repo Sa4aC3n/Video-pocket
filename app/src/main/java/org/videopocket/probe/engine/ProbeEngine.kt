@@ -393,7 +393,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 throw failure
             }
             val detail = "${outputs.size} playlist items saved (${totalBytes / 1024} KB)"
-            return ProbeResult(action, (System.nanoTime() - started) / 1_000_000, totalBytes, publishedUris.firstOrNull(), true, detail)
+            return ProbeResult(action, (System.nanoTime() - started) / 1_000_000, totalBytes, publishedUris.firstOrNull(), true, detail, publishedUris.toList())
         } finally {
             if (activeProcessId == id) activeProcessId = null
             folder.deleteRecursively()

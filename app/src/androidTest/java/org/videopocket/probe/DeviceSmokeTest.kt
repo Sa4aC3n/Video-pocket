@@ -39,13 +39,13 @@ class DeviceSmokeTest {
         val folder = Workspaces.create(context, "fixture-${UUID.randomUUID()}")
         val uris = mutableListOf<String>()
         try {
-            FFmpeg.getInstance().init(context)
+            BundledFfmpeg.initialize(context)
             val file = File(folder, "source.mp4")
             val binary = File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so")
             val builder = ProcessBuilder(binary.path, "-hide_banner", "-nostdin", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=15",
                 "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=44100", "-t", "4", "-c:v", "libx264", "-crf", "12", "-threads", "2", "-c:a", "aac", file.path)
                 .redirectErrorStream(true).redirectOutput(File(folder, "fixture.log"))
-            builder.environment()["LD_LIBRARY_PATH"] = File(context.noBackupFilesDir, "youtubedl-android/packages/ffmpeg/usr/lib").path + ":" + context.applicationInfo.nativeLibraryDir
+            builder.environment()["LD_LIBRARY_PATH"] = BundledFfmpeg.libraryPath(context)
             val child = builder.start()
             assertTrue(child.waitFor(30, TimeUnit.SECONDS))
             assertEquals(0, child.exitValue())

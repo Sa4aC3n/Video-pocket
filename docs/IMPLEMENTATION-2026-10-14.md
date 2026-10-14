@@ -1,62 +1,78 @@
 # Video Pocket implementation evidence — 2026-10-14
 
-Baseline: `74538de5770ca7ea5cb4c9e3b8cf29925d502e39`, verified on GitHub main.
-All updates are incremental fast-forwards on main. Existing binary resources and history are preserved.
+Baseline: `74538de5770ca7ea5cb4c9e3b8cf29925d502e39`. Work continues exclusively on `main`, using expected-head fast-forwards. No force-push, reset, branch replacement or deletion of prior user work was used. Every milestone's GitHub head and local Git tree were checked after synchronization.
 
-## Milestone log
+## Milestones
 
-| Commit | Change | Evidence |
-| --- | --- | --- |
-| `58fbde7a438b9c3244b9d60810ed285c8492f282` | Add Android CI | GitHub main and local tree synchronized. Initial run 38508436877 failed at SDK setup before Gradle; setup corrected in the next milestone. |
+| Commit | Implemented change |
+| --- | --- |
+| `58fbde7a438b9c3244b9d60810ed285c8492f282` | Android test/build/lint CI |
+| `96e488278349f0301ffec54f17a06f85cfcbf382` | Per-transfer engines, cancellation/publication boundaries, playlist metadata, atomic index, workspace protection |
+| `980d9b09e9159424f8332c9571b270cfd1c15be4` | Smart compression, local trimming/audio extraction/conversion and Studio |
+| `d05604bc9a881475877790a24f4fa2d10f38a366` | Persistent queue, responsive bilingual UI, searchable/filterable library, format routing |
+| `4ed5ef1992dcf35ace98079f40764b07618a301c` | Persistence/corruption recovery unit tests and native media instrumentation |
+| `b508d527cca3ddf46524a65a9dd8d126b7dfbb84` | Unified Home/download queue, remove guessed clip size/resolution/duration, actual runtime-version API, device-transfer rules, emulator disk fix |
+| `99fcd2e5a58c9bbf4399d94d3e68c61641ce6fba` | Resource watchdogs, MIME/rollback fixes, native page-size gate, subtitle conversion and fetch hardening, version 0.2.0-rc1, release/UI/performance gates |
 
-## Phase 4 changes in this milestone
+## Phase 4 — security, downloader, playlists and storage
 
-- Queue gives each transfer its own engine/process and notification. Cancellation retains the concurrency slot until cleanup finishes. FIFO scheduling fills all configured slots; active processing counts toward the limit.
-- Queue playlist audio uses the playlist audio action. Every output is indexed using its actual MediaStore name, bytes, MIME, duration and video dimensions. Unknown values remain unknown.
-- AtomicFile protects the existing JSON library format. Read/write failures surface instead of overwriting unreadable data with an empty index. Batch indexing deduplicates by saved URI. Failed media deletion retains the entry.
-- Active scratch directories are excluded from cleanup. Freed-byte reporting measures actual deletions. Recent cache entries are retained.
-- Download/clip/playlist outputs are validated before publication; playlist publication rolls back newly created rows on failure. Cancellation is rejected once atomic publication has started.
-- Remove invented clip progress milestones and inferred queue stages. Playlist total progress stays indeterminate because the backend reports individual items.
-- Unknown resolution cannot satisfy a specific requested resolution. Real 8K formats remain visible. Reject non-finite and malformed clip timestamps; reject clips outside known duration.
+- Each active task owns its engine/process and notification. Cancellation keeps the concurrency slot until cleanup. FIFO starts tasks up to the configured concurrency. Waiting tasks can pause; interrupted active tasks require explicit restart.
+- Home, clips and batch actions use one queue. Queue snapshots preserve clip parameters and output URIs through AtomicFile. A corrupt queue is reported and retained, not overwritten or silently resumed.
+- Playlist audio takes the playlist-audio path. Every completed URI is independently queried for its actual name, bytes, MIME, duration and dimensions, including rotation. Requested quality and aggregate playlist bytes are not copied to individual library entries.
+- Native download/clip/playlist output is validated before publication. Pending MediaStore rows are finalized only after writing. Publication/index failure rolls back only newly created rows. Once publication begins, cancellation is rejected to avoid partial saved state.
+- AtomicFile retains the existing JSON schema. Failed reads do not become empty libraries. Failed media deletion retains its index entry. Deduplication uses saved URI/source identity, not display title.
+- Active UUID scratch directories are excluded from cleanup. Cleanup measures deleted bytes. Storage work runs off the UI thread; the UI labels usage as indexed media plus temporary files, not total device/app storage.
+- Public URL validation, bounded/revalidated page redirects, bounded subtitle reads, ignored external native configuration/plugins and no remote code components. No account cookies, credential scraping or DRM bypass.
+- Native downloads have a free-space watchdog, bounded retry/socket settings and one-hour execution timeout. Real per-transfer progress is displayed; playlist aggregate progress remains unknown. No speed/ETA is fabricated.
 
-## Verification and environment
+## Phases 5–6 — local media processing
 
-- Local `bash gradlew testDebugUnitTest assembleDebug lintDebug --console=plain`: attempted, blocked before Gradle by `UnknownHostException: services.gradle.org`.
-- Local JDK: OpenJDK 17.0.20. No local Android SDK/emulator/device discovered.
-- GitHub Actions is available. Build/test/lint results will be recorded after fixes and reruns, not inferred from source review.
-- Source files were retrieved through the authorized GitHub connection and validated against Git blob hashes. Two large binary resources cannot be downloaded through the connector; they remain unchanged in the remote tree. CI checks out the full repository.
-- `git diff --check`: passed for this milestone.
+- Document picker and library entry point for compression, trimming, audio extraction and conversion. Source content URIs are read-only and copied to private scratch space. FFmpeg input protocols are limited to local file/pipe.
+- Encoders/muxers are enumerated and each candidate encoder must encode a local sample before it is offered. H.264/HEVC, VP9, AAC, Opus, MP3 and PCM are conditional, not universal claims. Software encoding only.
+- High-quality, balanced and small-file presets preserve aspect ratio/even dimensions and avoid upscaling. Compact preset prefers verified HEVC with H.264 fallback. Optional size cap uses a bitrate budget and at most two attempts; the actual output must meet the cap. Non-shrinking compression results are not published.
+- FFmpeg `out_time_us` drives progress; copy/validation/save stages are indeterminate. Completion reaches 100 only after validation/publication. Cancellation terminates the owned Studio process and removes its scratch work.
+- Validate duration and required tracks, reject missing tracks/protected/HDR inputs, retain originals, bound logging/threads/time and watch free space. Output indexing failure rolls back the newly published file.
+- Real SRT/VTT timed-cue conversion preserves Unicode and timing; JSON/HTML/unsupported subtitle input is not renamed to SRT. Subtitle publication uses safe names and pending-row rollback.
+- Device testing exposed missing `libc++_shared.so` when Studio starts independently. The corrective implementation extracts that existing bundled library from the wrapper's Python archive without initializing the network downloader or fetching code. Its rerun is recorded below when available.
 
-## Remaining work
+## Phases 7–8 — UI, library and queue
 
-Phases 5–8 implementation, final Gradle/lint/regression results, device media tests, release signing and release readiness remain open. No production-readiness claim is made.
+- Material 3 phone bottom navigation and wide-screen navigation rail, bounded content width, light/dark/system themes, Arabic RTL/English LTR. New installs default to Arabic; prior language preferences are retained.
+- Keyed lazy lists for library/downloads, search across titles/formats/platforms/collections, media/favorite/clip filters, collection filtering, date/title/size sorting, rename/collection editing and confirmed deletion.
+- Play/share uses the actual URI and resolver MIME, including WAV; failures are visible. Unknown sizes/resolutions remain unknown. Preview reports unavailable streams and releases its player on disposal.
+- Errors are bilingual; Studio progress uses polite accessibility announcements. Material components provide standard semantics and touch targets. Automated UI tests exercise actual language/theme/navigation controls and inspect RTL/LTR order.
+- No persistent foreground service: keep the app open. Process-death recovery restarts rather than resumes partial bytes. No automatic grouping/AI tagging or duplicate-content hash scanner is claimed.
 
-## Phases 5–6 implementation milestone
+## Phase 9 — verification evidence
 
-- Phase 4 commit: `96e488278349f0301ffec54f17a06f85cfcbf382`, verified on GitHub main and against the local Git tree.
-- Added Media Studio with Android document picker and library editing entry point: compress, trim with explicit start/end, extract audio, convert.
-- Existing bundled FFmpeg runs locally with argument arrays, no shell, no network input and no paid service. Initialization remains deferred until Studio is opened.
-- Encoder availability is based on `-encoders`, muxer enumeration and successful sample encoding on the device. Capability results are process-local and cached. Adaptive software codec selection uses H.264 / HEVC; WebM uses VP9 + Opus when verified. No unsupported AVI/WMV options are exposed.
-- Three presets preserve aspect ratio, even output dimensions, and never upscale. Optional compression size cap uses a bitrate budget with bounded second attempt and verifies final size. Larger-than-original compression output is not published.
-- Actual FFmpeg output timestamps drive progress; import, validation and save phases are indeterminate. Cancellation kills the owned subprocess and removes only the new scratch output. Once atomic publication starts cancellation is disabled.
-- Original URI is opened read-only. New output is validated for track type/duration, stored through pending MediaStore rows, and indexed. Index failure rolls back only the newly published output.
-- Reject protected inputs and HDR conversions rather than silently altering HDR colors. Processing has a one-hour timeout, bounded threads, bounded diagnostics, and storage checks during copying/encoding.
-- Added policy regression tests for capabilities, bitrate budget, trimming, dimensions and progress. Compilation/runtime results pending CI; these are implementation claims only.
-- CI run 38508890686 failed before Gradle because `sdkmanager` was not on PATH. Android setup action is now restored with explicit supported packages (its obsolete default `tools` package is excluded).
+| Run / exact source | Observed result |
+| --- | --- |
+| 38508436877 / `58fbde7` | Failed before Gradle: obsolete SDK `tools` package; corrected |
+| 38508890686 / `96e4882` | Failed before Gradle: sdkmanager PATH; corrected with explicit setup action packages |
+| 38509393540 / `980d9b0` | **PASS** `testDebugUnitTest assembleDebug lintDebug`, 6m 8s; artifact reports **58 unit tests, 0 failures/errors/skips; lint 0 errors** |
+| 38509927868 / `d05604b` | **PASS** test/build/lint workflow |
+| 38510090296 / `4ed5ef1` | Unit/build/lint job **PASS**; emulator failed before tests because requested userdata exceeded free disk |
+| 38540458431 / `b508d52` | Unit/build/test-APK/lint job **PASS**. Emulator booted; **2 tests, 1 pass, 1 failure**. Lazy startup passed. FFmpeg failed to load `libc++_shared.so` before capability discovery. This is an application integration failure, not a passed media test. |
+| 38541882373 / `99fcd2e` | Running at this checkpoint; includes release build/lint and expanded UI/native regressions |
 
-## Phases 7–8 implementation milestone
+Local Gradle was attempted but blocked before execution by `UnknownHostException: services.gradle.org`; JDK 17 is present, but no local Android SDK/device is available. Actual builds/tests run in GitHub Actions with full checkouts. `git diff --check` and shell syntax validation passed before each relevant milestone.
 
-- Media Studio commit: `980d9b09e9159424f8332c9571b270cfd1c15be4`, synchronized and verified.
-- Adaptive navigation uses a rail on wide displays and a bottom bar on phones; content width is bounded for tablets. Arabic is the default for new installs while existing saved language choices are preserved. RTL/LTR and light/dark/system remain functional. Improved light-theme text contrast.
-- Library and downloads use keyed lazy lists rather than composing every row. Library search covers titles, formats, platforms, and collections; filters/sorting and collection editing are connected to storage.
-- Library I/O runs off the UI thread and changes are observed after queue or Studio processing. Failed library actions surface in the UI. Play/share resolves the output URI rather than a non-unique title. Unknown file sizes are displayed as unknown.
-- Queue snapshots use AtomicFile in no-backup private storage. Interrupted tasks require explicit restart; no false byte-resume claim. A damaged queue is retained instead of overwritten. State changes are persisted through a conflated IO channel, not on every progress tick.
-- Download format selections now reach the engine and request the chosen container. Unsupported codec/container combinations fail explicitly; Studio offers actual re-encoding options.
-- Batch quality is resolved from the source instead of assuming 1080p. New share intents update Home correctly. Public-page redirects are bounded and validated, localhost/link-local loopback targets are rejected, and error-body reads are bounded.
-- Limitation: tasks run while the app process lives; this milestone does not implement a persistent background foreground service. UI states that keeping the app open is required. Process-death recovery restarts downloads rather than resuming partial bytes.
+Instrumentation uses real generated video/audio, not mocked processing: compression reduction, trim duration, audio extraction, optional available WebM conversion, real progress/cancellation and SHA-256 preservation of originals. Downloader execution is checked offline with `--version`; no all-provider live compatibility claim follows from this check.
 
-## Verified build milestone
+Native packaging audit of the verified `980d9b0` APK: **512 ELF files; 10 WebP-related dependencies have 4 KB alignment**. See the [release audit](RELEASE-READINESS.md). Lint has warnings (dependency/SDK updates, legacy icon/resources and style); it is not warning-free. Fixed-rate native scheduling and missing extraction-rule warnings were addressed.
 
-- GitHub Actions run **38509393540** on exact commit `980d9b09e9159424f8332c9571b270cfd1c15be4`: **SUCCESS**. `testDebugUnitTest assembleDebug lintDebug` completed (`BUILD SUCCESSFUL in 6m 8s`). This is an actual Gradle result from a full checkout, not a static estimate.
-- UI/queue milestone commit `d05604bc9a881475877790a24f4fa2d10f38a366` is synchronized; its separate CI run is still in progress at this checkpoint.
-- Added Robolectric tests for index corruption preservation, batch metadata/deduplication, active workspace safety, and interrupted queue restoration. Added emulator instrumentation for lazy startup and actual FFmpeg compression/trim/audio extraction, timestamp progress and original SHA-256 preservation. These new tests are pending execution.
+Startup timings, memory and UI screenshots are collected by `scripts/verify-device.sh` on the emulator. These are measurements of that runner only, not physical-device performance promises. Final values will be added after the corresponding test run.
+
+## Phase 10 — release audit and limits
+
+Version is **0.2.0-rc1 / 2**; application ID and user-data schema are unchanged. CI now requires debug/test/release APK compilation, unit tests, debug/release lint and connected emulator tests. The release APK is unsigned. README now distinguishes real behavior, conditional support and open limits. See [source security review](SECURITY-REVIEW-2026-10-14.md).
+
+Open release gates:
+
+1. Rebuild/audit the native dependency bundle for 16 KB devices. Current native features explicitly reject unsupported page sizes. An upstream issue documents the same problem; no compatible release was found in the checked upstream listings.
+2. Original signing identity, signed upgrade test with existing data, corresponding native source/licenses and current store requirements before public distribution.
+3. ARM64 physical-device playback, audio/video sync listening, portrait/variable-frame-rate/long-file processing, low-space/power-loss and TalkBack/large-font/tablet evaluation. Hardware is unavailable here.
+4. Live provider regression matrix; sources may require login, apply geographic/rate restrictions or change formats. No bypass is attempted.
+5. Foreground-process lifetime, no byte-resume guarantee, no HDR processing, no hardware encoding claim, no complete DNS-rebinding defense or complete native CVE scan.
+
+The app must not be described as production-ready solely because Gradle passes. Final regression and synchronization evidence follow in the next checkpoint.

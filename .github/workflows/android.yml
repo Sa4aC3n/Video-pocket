@@ -15,7 +15,7 @@ concurrency:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -43,21 +43,6 @@ jobs:
             app/build/outputs/apk/release/
           if-no-files-found: warn
 
-  device-smoke:
-    needs: verify
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
-          java-version: '17'
-      - uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools platforms;android-35 build-tools;35.0.0
-          log-accepted-android-sdk-licenses: false
-      - uses: gradle/actions/setup-gradle@v4
       - name: Enable emulator acceleration
         run: |
           sudo chmod 666 /dev/kvm

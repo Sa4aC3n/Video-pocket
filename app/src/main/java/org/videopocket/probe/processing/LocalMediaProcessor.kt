@@ -40,7 +40,7 @@ class LocalMediaProcessor(private val context: Context) {
     private fun initialize() {
         if (!NativeRuntimePolicy.supportsPageSize(android.system.Os.sysconf(android.system.OsConstants._SC_PAGESIZE)))
             throw ProcessingFailure("PAGE_SIZE_UNSUPPORTED")
-        FFmpeg.getInstance().init(context)
+        BundledFfmpeg.initialize(context)
         if (!binary.isFile || !binary.canExecute()) throw ProcessingFailure("ENGINE_UNAVAILABLE")
     }
     private fun execute(args: List<String>, directory: File, timeoutSeconds: Long = 3600, line: (String) -> Unit = {}): String {
@@ -48,8 +48,7 @@ class LocalMediaProcessor(private val context: Context) {
         val builder = ProcessBuilder(listOf(binary.absolutePath) + listOf("-hide_banner", "-nostdin") + args)
             .directory(directory).redirectErrorStream(true)
         builder.environment().apply {
-            val packages = File(context.noBackupFilesDir, "youtubedl-android/packages")
-            put("LD_LIBRARY_PATH", listOf(File(packages, "ffmpeg/usr/lib").path, context.applicationInfo.nativeLibraryDir).joinToString(":"))
+            put("LD_LIBRARY_PATH", BundledFfmpeg.libraryPath(context))
             put("TMPDIR", directory.absolutePath)
         }
         val child = synchronized(lock) { checkCancelled(); builder.start().also { process = it } }

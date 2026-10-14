@@ -380,6 +380,9 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             if (outputs.isEmpty()) throw ProbeFailure(Problem.CONVERSION, "No playlist items downloaded")
             if (outputs.any { it.length() <= 0L }) throw ProbeFailure(Problem.CONVERSION, "Playlist contains an empty output file")
             val totalBytes = outputs.sumOf { it.length() }
+            if (outputs.any { it.length() > 512L * 1024 * 1024 }) {
+                throw ProbeFailure(Problem.SPACE, "Playlist output exceeds the 512 MB per-file limit")
+            }
             val publishedUris = mutableListOf<String>()
             try {
                 outputs.forEach { publishedUris.add(publish(it, action)) }

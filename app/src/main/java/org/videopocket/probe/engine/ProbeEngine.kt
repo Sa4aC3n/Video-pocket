@@ -434,7 +434,8 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: throw ProbeFailure(Problem.SPACE)
         try {
             resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: throw ProbeFailure(Problem.SPACE)
-            resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+            val finalized = resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+            if (finalized <= 0) throw ProbeFailure(Problem.CONVERSION, "Unable to finalize saved media")
             return uri.toString()
         } catch (e: Exception) { resolver.delete(uri, null, null); throw e }
     }
@@ -456,7 +457,8 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: throw ProbeFailure(Problem.SPACE)
         try {
             resolver.openOutputStream(uri)?.use { out -> file.inputStream().use { it.copyTo(out) } } ?: throw ProbeFailure(Problem.SPACE)
-            resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+            val finalized = resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+            if (finalized <= 0) throw ProbeFailure(Problem.CONVERSION, "Unable to finalize saved media")
             return uri.toString()
         } catch (e: Exception) { resolver.delete(uri, null, null); throw e }
     }

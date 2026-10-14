@@ -10,6 +10,7 @@ import org.videopocket.probe.core.*
 import org.videopocket.probe.engine.PocketNotifier
 import org.videopocket.probe.engine.ProbeEngine
 import java.util.UUID
+import kotlinx.coroutines.channels.Channel
 
 enum class DownloadState(val label: String, val arabicLabel: String) {
     QUEUED("Queued", "في الانتظار"),
@@ -77,12 +78,40 @@ class DownloadQueueManager(
     private val activeJobs = mutableMapOf<String, Job>()
     private val engines = mutableMapOf<String, ProbeEngine>()
     private var closed = false
+    private var recovering = true
+    private var persistenceAvailable = true
+    private val queueStore = QueueStore(application)
+    private val saves = Channel<List<DownloadTask>>(Channel.CONFLATED)
+    private val storageScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    var persistenceError by mutableStateOf(false)
+        private set
+
     private var concurrency by mutableStateOf(AppSettings.maxConcurrentDownloads)
     var tasks by mutableStateOf(listOf<DownloadTask>())
         private set
     var maxConcurrent: Int
         get() = concurrency
         set(value) { concurrency = value.coerceIn(1, 4); processNext() }
+
+    init {
+        scope.launch {
+            try {
+                val saved = withContext(Dispatchers.IO) { queueStore.load() }
+                tasks = (tasks + saved).distinctBy { it.id }
+            } catch (_: Exception) { persistenceError = true; persistenceAvailable = false }
+            finally { recovering = false; persist(); processNext() }
+        }
+        storageScope.launch {
+            for (snapshot in saves) {
+                try { queueStore.save(snapshot) }
+                catch (_: Exception) { withContext(Dispatchers.Main) { persistenceError = true } }
+            }
+            storageScope.cancel()
+        }
+    }
+    private fun persist() {
+        if (!recovering && persistenceAvailable) saves.trySend(tasks.toList())
+    }
 
     val activeTasks get() = tasks.filter { it.state in ACTIVE_STATES }
     val queuedTasks get() = tasks.filter { it.state in setOf(DownloadState.QUEUED, DownloadState.PAUSED) }
@@ -94,6 +123,7 @@ class DownloadQueueManager(
         val validated = try { task.copy(url = LinkPolicy.validate(task.url)) }
         catch (_: Exception) { task.copy(state = DownloadState.FAILED, error = Problem.INVALID_URL.name) }
         tasks = listOf(validated) + tasks
+        persist()
         processNext()
     }
 
@@ -126,19 +156,24 @@ class DownloadQueueManager(
     }
     fun removeTask(taskId: String) {
         cancel(taskId)
-        if (!activeJobs.containsKey(taskId)) tasks = tasks.filterNot { it.id == taskId }
+        if (!activeJobs.containsKey(taskId)) { tasks = tasks.filterNot { it.id == taskId }; persist() }
     }
-    fun clearCompleted() { tasks = tasks.filterNot { it.state == DownloadState.COMPLETED } }
+    fun clearCompleted() { tasks = tasks.filterNot { it.state == DownloadState.COMPLETED }; persist() }
     fun close() {
         closed = true
         engines.values.forEach { it.cancelCurrent() }
+        persist()
+        saves.close()
         scope.cancel()
     }
     private fun updateTask(id: String, transform: (DownloadTask) -> DownloadTask) {
+        val previous = tasks.firstOrNull { it.id == id }
         tasks = tasks.map { if (it.id == id) transform(it) else it }
+        val updated = tasks.firstOrNull { it.id == id }
+        if (previous?.state != updated?.state || previous?.outputUri != updated?.outputUri) persist()
     }
     private fun processNext() {
-        if (closed) return
+        if (closed || recovering) return
         while (activeJobs.size < maxConcurrent) {
             val next = tasks.asReversed().firstOrNull { it.state == DownloadState.QUEUED } ?: break
             val engine = ProbeEngine(application)
@@ -176,7 +211,7 @@ class DownloadQueueManager(
                         media.isPlaylist -> ProbeAction.PLAYLIST_VIDEO
                         else -> ProbeAction.VIDEO
                     }
-                    engine.download(task.url, media, action, task.height, task.bitrate, progress)
+                    engine.downloadWithFormat(task.url, media, action, if (task.height < 0) media.defaultHeight else task.height, task.bitrate, task.format, progress)
                 }
                 check(downloaded.passed && !downloaded.outputUri.isNullOrBlank())
                 LibraryIndexer.index(application, downloaded, media, task.url, task.platform, task.clipRequest)

@@ -43,3 +43,14 @@ Phases 5–8 implementation, final Gradle/lint/regression results, device media 
 - Reject protected inputs and HDR conversions rather than silently altering HDR colors. Processing has a one-hour timeout, bounded threads, bounded diagnostics, and storage checks during copying/encoding.
 - Added policy regression tests for capabilities, bitrate budget, trimming, dimensions and progress. Compilation/runtime results pending CI; these are implementation claims only.
 - CI run 38508890686 failed before Gradle because `sdkmanager` was not on PATH. Android setup action is now restored with explicit supported packages (its obsolete default `tools` package is excluded).
+
+## Phases 7–8 implementation milestone
+
+- Media Studio commit: `980d9b09e9159424f8332c9571b270cfd1c15be4`, synchronized and verified.
+- Adaptive navigation uses a rail on wide displays and a bottom bar on phones; content width is bounded for tablets. Arabic is the default for new installs while existing saved language choices are preserved. RTL/LTR and light/dark/system remain functional. Improved light-theme text contrast.
+- Library and downloads use keyed lazy lists rather than composing every row. Library search covers titles, formats, platforms, and collections; filters/sorting and collection editing are connected to storage.
+- Library I/O runs off the UI thread and changes are observed after queue or Studio processing. Failed library actions surface in the UI. Play/share resolves the output URI rather than a non-unique title. Unknown file sizes are displayed as unknown.
+- Queue snapshots use AtomicFile in no-backup private storage. Interrupted tasks require explicit restart; no false byte-resume claim. A damaged queue is retained instead of overwritten. State changes are persisted through a conflated IO channel, not on every progress tick.
+- Download format selections now reach the engine and request the chosen container. Unsupported codec/container combinations fail explicitly; Studio offers actual re-encoding options.
+- Batch quality is resolved from the source instead of assuming 1080p. New share intents update Home correctly. Public-page redirects are bounded and validated, localhost/link-local loopback targets are rejected, and error-body reads are bounded.
+- Limitation: tasks run while the app process lives; this milestone does not implement a persistent background foreground service. UI states that keeping the app open is required. Process-death recovery restarts downloads rather than resuming partial bytes.

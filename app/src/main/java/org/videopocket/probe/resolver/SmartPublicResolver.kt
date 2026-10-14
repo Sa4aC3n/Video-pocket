@@ -58,7 +58,7 @@ object SmartPublicResolver {
     suspend fun expandCanonicalUrl(url: String, maxRedirects: Int = 5): String = expandShortUrl(url, maxRedirects)
 
     suspend fun expandShortUrl(url: String, maxRedirects: Int = 5): String = withContext(Dispatchers.IO) {
-        var currentUrl = url.trim()
+        var currentUrl = LinkPolicy.validate(url)
         var redirects = 0
 
         while (redirects < maxRedirects) {
@@ -94,7 +94,7 @@ object SmartPublicResolver {
                     val location = conn.getHeaderField("Location")
                     if (location.isNullOrBlank()) break
                     val nextUri = parsedUri.resolve(location)
-                    currentUrl = nextUri.toString()
+                    currentUrl = LinkPolicy.validate(nextUri.toString())
                     redirects++
                 } else {
                     break
@@ -127,9 +127,9 @@ object SmartPublicResolver {
     suspend fun inspectPublicPage(url: String): PublicPageInspection = withContext(Dispatchers.IO) {
         var conn: HttpURLConnection? = null
         try {
-            val parsedUrl = URL(url.trim())
+            val parsedUrl = URL(LinkPolicy.validate(expandShortUrl(url)))
             conn = (parsedUrl.openConnection() as HttpURLConnection).apply {
-                instanceFollowRedirects = true
+                instanceFollowRedirects = false
                 requestMethod = "GET"
                 connectTimeout = 9000
                 readTimeout = 9000
@@ -143,12 +143,13 @@ object SmartPublicResolver {
 
             // 1. Check HTTP response codes
             when (code) {
+                in 300..399 -> return@withContext PublicPageInspection.Error("Redirect limit exceeded")
                 404, 410 -> return@withContext PublicPageInspection.NotFound
                 429 -> return@withContext PublicPageInspection.RateLimited
                 401 -> return@withContext PublicPageInspection.LoginRequired(isTrulyPrivate = false, reason = "HTTP 401 Unauthorized")
                 403 -> {
                     val errorBody = try {
-                        conn.errorStream?.bufferedReader()?.use { it.readText().take(4096).lowercase() }.orEmpty()
+                        conn.errorStream?.bufferedReader()?.use { reader -> val chars = CharArray(4096); val count = reader.read(chars); if (count > 0) String(chars, 0, count).lowercase() else "" }.orEmpty()
                     } catch (_: Exception) { "" }
 
                     return@withContext when {

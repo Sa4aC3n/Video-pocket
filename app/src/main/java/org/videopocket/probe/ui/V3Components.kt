@@ -36,6 +36,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.videopocket.probe.core.ClipRequest
 import org.videopocket.probe.core.PocketLibraryItem
+import org.videopocket.probe.core.AppSettings
 import org.videopocket.probe.core.PocketLibraryManager
 import org.videopocket.probe.download.DownloadQueueManager
 import org.videopocket.probe.download.DownloadState
@@ -317,8 +318,9 @@ fun BatchDownloadDialog(
                                     url = url,
                                     title = "Batch Media (${provider.name})",
                                     platform = provider.name,
-                                    quality = "1080p",
-                                    format = "mp4"
+                                    quality = "Best available",
+                                    height = -1,
+                                    format = AppSettings.defaultVideoFormat
                                 )
                                 queueManager.enqueue(task)
                             }

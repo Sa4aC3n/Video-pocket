@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -37,13 +38,19 @@ import java.time.Instant
 import java.util.UUID
 
 class MainActivity : ComponentActivity() {
+    private var sharedText by mutableStateOf("")
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        sharedText = if (intent.action == Intent.ACTION_SEND) intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty() else ""
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         AppSettings.init(this)
         FeatureFlagsManager.init(this)
 
-        val shared = if (intent?.action == Intent.ACTION_SEND) {
+        sharedText = if (intent?.action == Intent.ACTION_SEND) {
             intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
         } else {
             ""
@@ -51,7 +58,7 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             VideoPocketTheme(themeMode = AppSettings.themeMode) {
-                MainContainer(sharedIntent = shared)
+                MainContainer(sharedIntent = sharedText)
             }
         }
     }
@@ -141,20 +148,18 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
     }
 
 
-    fun deleteLibraryItem(id: String) {
-        PocketLibraryManager.deleteItem(getApplication(), id)
-        refreshLibrary()
+    var libraryActionError by mutableStateOf(false)
+        private set
+    private fun mutateLibrary(action: () -> Unit) {
+        viewModelScope.launch {
+            try { withContext(Dispatchers.IO) { action() }; libraryActionError = false; refreshLibrary() }
+            catch (_: Exception) { libraryActionError = true }
+        }
     }
-
-    fun renameLibraryItem(id: String, newTitle: String) {
-        PocketLibraryManager.renameItem(getApplication(), id, newTitle)
-        refreshLibrary()
-    }
-
-    fun toggleFavorite(id: String) {
-        PocketLibraryManager.toggleFavorite(getApplication(), id)
-        refreshLibrary()
-    }
+    fun deleteLibraryItem(id: String) = mutateLibrary { PocketLibraryManager.deleteItem(getApplication(), id) }
+    fun renameLibraryItem(id: String, title: String) = mutateLibrary { PocketLibraryManager.renameItem(getApplication(), id, title.trim()) }
+    fun toggleFavorite(id: String) = mutateLibrary { PocketLibraryManager.toggleFavorite(getApplication(), id) }
+    fun updateCollections(id: String, collections: List<String>) = mutateLibrary { PocketLibraryManager.updateCollections(getApplication(), id, collections) }
 
     fun cancel() {
         if (!busy) return
@@ -248,7 +253,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun run(action: ProbeAction, height: Int, bitrate: Int) {
+    fun run(action: ProbeAction, height: Int, bitrate: Int, outputFormat: String = AppSettings.defaultVideoFormat) {
         if (busy || !ready) return
         val media = info ?: return
         val url = inspectedUrl ?: return
@@ -262,7 +267,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
             val started = System.nanoTime()
             try {
                 val result = withContext(Dispatchers.IO) {
-                    engine.download(url, media, action, height, bitrate) { p ->
+                    engine.downloadWithFormat(url, media, action, height, bitrate, outputFormat) { p ->
                         val pInt = p.toInt()
                         viewModelScope.launch(Dispatchers.Main.immediate) {
                             progress = p
@@ -376,94 +381,48 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var processingUri by rememberSaveable { mutableStateOf<String?>(null) }
     var processingTitle by rememberSaveable { mutableStateOf<String?>(null) }
-    var arabic by rememberSaveable { mutableStateOf(AppSettings.isArabic) }
+    val arabic = AppSettings.isArabic
     fun t(en: String, ar: String) = if (arabic) ar else en
-
-    val layoutDirection = if (arabic) LayoutDirection.Rtl else LayoutDirection.Ltr
-    CompositionLocalProvider(LocalLayoutDirection provides layoutDirection) {
-        Scaffold(
-            contentWindowInsets = WindowInsets.systemBars,
-            bottomBar = {
-                NavigationBar {
-                    NavigationBarItem(
-                        icon = { Icon(Icons.Default.Home, contentDescription = t("Home", "الرئيسية")) },
-                        label = { Text(t("Home", "الرئيسية")) },
-                        selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 }
-                    )
-                    NavigationBarItem(
-                        icon = {
-                            val activeCount = model.queueManager.activeTasks.size
-                            if (activeCount > 0) {
-                                BadgedBox(badge = { Badge { Text("$activeCount") } }) {
-                                    Icon(Icons.Default.Download, contentDescription = t("Downloads", "التنزيلات"))
-                                }
-                            } else {
-                                Icon(Icons.Default.Download, contentDescription = t("Downloads", "التنزيلات"))
-                            }
-                        },
-                        label = { Text(t("Downloads", "التنزيلات")) },
-                        selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 }
-                    )
-                    NavigationBarItem(
-                        icon = {
-                            val count = model.libraryItems.size
-                            if (count > 0) {
-                                BadgedBox(badge = { Badge { Text("$count") } }) {
-                                    Icon(Icons.Default.VideoLibrary, contentDescription = t("Pocket", "مكتبتي"))
-                                }
-                            } else {
-                                Icon(Icons.Default.VideoLibrary, contentDescription = t("Pocket", "مكتبتي"))
-                            }
-                        },
-                        label = { Text(t("Pocket", "مكتبتي")) },
-                        selected = selectedTab == 2,
-                        onClick = { selectedTab = 2 }
-                    )
-                    NavigationBarItem(
-                        icon = { Icon(Icons.Default.Tune, contentDescription = t("Media Studio", "استوديو الوسائط")) },
-                        label = { Text(t("Studio", "استوديو")) },
-                        selected = selectedTab == 4,
-                        onClick = { selectedTab = 4 }
-                    )
-                    NavigationBarItem(
-                        icon = { Icon(Icons.Default.Settings, contentDescription = t("Settings", "الإعدادات")) },
-                        label = { Text(t("Settings", "الإعدادات")) },
-                        selected = selectedTab == 3,
-                        onClick = { selectedTab = 3 }
-                    )
+    val destinations = listOf(
+        Triple(0, Icons.Default.Home, t("Home", "الرئيسية")),
+        Triple(1, Icons.Default.Download, t("Downloads", "التنزيلات")),
+        Triple(2, Icons.Default.VideoLibrary, t("Pocket", "مكتبتي")),
+        Triple(4, Icons.Default.Tune, t("Studio", "استوديو")),
+        Triple(3, Icons.Default.Settings, t("Settings", "الإعدادات"))
+    )
+    CompositionLocalProvider(LocalLayoutDirection provides if (arabic) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val expanded = maxWidth >= 840.dp
+            Scaffold(contentWindowInsets = WindowInsets.systemBars, bottomBar = {
+                if (!expanded) NavigationBar {
+                    destinations.forEach { (id, icon, label) ->
+                        NavigationBarItem(selected = selectedTab == id, onClick = { selectedTab = id },
+                            icon = { Icon(icon, contentDescription = null) }, label = { Text(label, maxLines = 1) })
+                    }
                 }
-            }
-        ) { paddingValues ->
-            Box(Modifier.padding(paddingValues).fillMaxSize()) {
-                when (selectedTab) {
-                    0 -> HomeScreen(
-                        sharedIntent = sharedIntent,
-                        model = model,
-                        arabic = arabic,
-                        onToggleLanguage = {
-                            val newAr = !arabic
-                            arabic = newAr
-                            AppSettings.setLanguage(newAr)
-                        },
-                        onNavigateDownloads = { selectedTab = 1 },
-                        onNavigatePocket = { selectedTab = 2 }
-                    )
-                    1 -> DownloadsScreen(model = model, arabic = arabic)
-                    2 -> LibraryScreen(model = model, arabic = arabic, onNavigateHome = { selectedTab = 0 }, onProcess = {
-                        processingUri = it.uriString; processingTitle = it.title; selectedTab = 4
-                    })
-                    4 -> ProcessingScreen(arabic, processingUri, processingTitle)
-                    3 -> SettingsScreen(
-                        model = model,
-                        arabic = arabic,
-                        onToggleLanguage = {
-                            val newAr = !arabic
-                            arabic = newAr
-                            AppSettings.setLanguage(newAr)
+            }) { insets ->
+                Row(Modifier.padding(insets).fillMaxSize()) {
+                    if (expanded) NavigationRail {
+                        destinations.forEach { (id, icon, label) ->
+                            NavigationRailItem(selected = selectedTab == id, onClick = { selectedTab = id },
+                                icon = { Icon(icon, contentDescription = null) }, label = { Text(label) })
                         }
-                    )
+                    }
+                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
+                        Box(Modifier.widthIn(max = 1000.dp).fillMaxSize()) {
+                            when (selectedTab) {
+                                0 -> HomeScreen(sharedIntent, model, arabic,
+                                    onToggleLanguage = { AppSettings.setLanguage(!arabic) },
+                                    onNavigateDownloads = { selectedTab = 1 }, onNavigatePocket = { selectedTab = 2 })
+                                1 -> DownloadsScreen(model, arabic)
+                                2 -> LibraryScreen(model, arabic, onNavigateHome = { selectedTab = 0 }, onProcess = {
+                                    processingUri = it.uriString; processingTitle = it.title; selectedTab = 4
+                                })
+                                4 -> ProcessingScreen(arabic, processingUri, processingTitle)
+                                3 -> SettingsScreen(model, arabic, onToggleLanguage = { AppSettings.setLanguage(!arabic) })
+                            }
+                        }
+                    }
                 }
             }
         }

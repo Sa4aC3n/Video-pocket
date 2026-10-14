@@ -3,6 +3,9 @@ package org.videopocket.probe.ui
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -26,152 +29,37 @@ import org.videopocket.probe.download.DownloadTask
 fun DownloadsScreen(model: ProbeModel, arabic: Boolean) {
     val context = LocalContext.current
     fun t(en: String, ar: String) = if (arabic) ar else en
-
-    var queueFilter by rememberSaveable { mutableStateOf("all") }
-    val allTasks = model.queueManager.tasks
-    val filteredTasks = remember(allTasks, queueFilter) {
-        when (queueFilter) {
-            "active" -> allTasks.filter {
-                it.state == DownloadState.DOWNLOADING ||
-                it.state == DownloadState.MERGING ||
-                it.state == DownloadState.TRANSCODING ||
-                it.state == DownloadState.SAVING ||
-                it.state == DownloadState.RESOLVING
-            }
-            "completed" -> allTasks.filter { it.state == DownloadState.COMPLETED }
-            "failed" -> allTasks.filter { it.state == DownloadState.FAILED || it.state == DownloadState.CANCELLED }
-            "paused" -> allTasks.filter { it.state == DownloadState.PAUSED }
-            else -> allTasks
-        }
+    var filter by rememberSaveable { mutableStateOf("all") }
+    val all = model.queueManager.tasks
+    val rows = when (filter) {
+        "active" -> model.queueManager.activeTasks
+        "completed" -> model.queueManager.completedTasks
+        "failed" -> model.queueManager.failedTasks
+        "waiting" -> model.queueManager.queuedTasks
+        else -> all
     }
-
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = t("Downloads & Queue", "التنزيلات وقائمة الانتظار"),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = t("Real-time download manager", "إدارة التنزيلات الحية والمهام"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
-            if (allTasks.any { it.state == DownloadState.COMPLETED }) {
-                TextButton(onClick = { model.queueManager.clearCompleted() }) {
-                    Text(t("Clear Completed", "مسح المكتمل"))
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item {
+            Text(t("Downloads & queue", "التنزيلات وقائمة الانتظار"), style = MaterialTheme.typography.headlineMedium)
+            Text(t("Interrupted downloads can be restarted. Keep the app open for reliable processing.", "يمكن إعادة بدء التنزيلات المتوقفة. أبقِ التطبيق مفتوحًا لضمان استمرار المعالجة."))
+            if (all.any { it.state == DownloadState.COMPLETED }) TextButton(onClick = model.queueManager::clearCompleted) { Text(t("Clear completed", "مسح المكتمل")) }
+            if (model.queueManager.persistenceError) Text(t("Queue history could not be saved or read. Existing history is retained.", "تعذر حفظ سجل الانتظار أو قراءته. تم الاحتفاظ بالسجل الموجود."), color = MaterialTheme.colorScheme.error)
+        }
+        item {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("all" to t("All", "الكل"), "active" to t("Active", "النشطة"), "waiting" to t("Waiting", "الانتظار"), "completed" to t("Done", "المكتملة"), "failed" to t("Retry", "إعادة المحاولة")).forEach { (key, label) ->
+                    FilterChip(selected = filter == key, onClick = { filter = key }, label = { Text(label) })
                 }
             }
         }
-
-        // Filter Chips
-        if (allTasks.isNotEmpty()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = queueFilter == "all",
-                    onClick = { queueFilter = "all" },
-                    label = { Text(t("All (${allTasks.size})", "الكل (${allTasks.size})")) }
-                )
-                FilterChip(
-                    selected = queueFilter == "active",
-                    onClick = { queueFilter = "active" },
-                    label = { Text(t("Active", "النشطة")) }
-                )
-                FilterChip(
-                    selected = queueFilter == "completed",
-                    onClick = { queueFilter = "completed" },
-                    label = { Text(t("Done", "المكتملة")) }
-                )
-                FilterChip(
-                    selected = queueFilter == "failed",
-                    onClick = { queueFilter = "failed" },
-                    label = { Text(t("Failed", "فشل")) }
-                )
-            }
-
-            // Task List
-            filteredTasks.forEach { task ->
-                DownloadTaskCard(
-                    task = task,
-                    arabic = arabic,
-                    onPause = { model.queueManager.pause(task.id) },
-                    onResume = { model.queueManager.resume(task.id) },
-                    onCancel = { model.queueManager.cancel(task.id) },
-                    onRetry = { model.queueManager.retry(task.id) },
-                    onRemove = { model.queueManager.removeTask(task.id) },
-                    onPlay = {
-                        val libItem = model.libraryItems.firstOrNull { it.title == task.title }
-                        if (libItem != null) {
-                            PocketLibraryManager.playItem(context, libItem)
-                        }
-                    },
-                    onShare = {
-                        val libItem = model.libraryItems.firstOrNull { it.title == task.title }
-                        if (libItem != null) {
-                            PocketLibraryManager.shareItem(context, libItem)
-                        }
-                    }
-                )
-            }
-        } else {
-            // Empty Queue State
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(40.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.secondaryContainer,
-                        modifier = Modifier.size(64.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.DownloadDone,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                                modifier = Modifier.size(32.dp)
-                            )
-                        }
-                    }
-                    Text(
-                        text = t("No active downloads", "لا توجد تنزيلات نشطة حاليًا"),
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = t("Items you download will appear here with live progress.",
-                                 "الملفات التي تقوم بتنزيلها ستظهر هنا مع التقدم اللحظي."),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                }
-            }
+        if (rows.isEmpty()) item { Text(t("No downloads in this view.", "لا توجد تنزيلات في هذا العرض.")) }
+        items(rows, key = { it.id }) { task ->
+            DownloadTaskCard(task, arabic,
+                onPause = { model.queueManager.pause(task.id) }, onResume = { model.queueManager.resume(task.id) },
+                onCancel = { model.queueManager.cancel(task.id) }, onRetry = { model.queueManager.retry(task.id) },
+                onRemove = { model.queueManager.removeTask(task.id) },
+                onPlay = { model.libraryItems.firstOrNull { it.uriString == task.outputUri }?.let { PocketLibraryManager.playItem(context, it) } },
+                onShare = { model.libraryItems.firstOrNull { it.uriString == task.outputUri }?.let { PocketLibraryManager.shareItem(context, it) } })
         }
     }
 }
@@ -306,10 +194,8 @@ fun DownloadTaskCard(
                         )
                     }
                 }
-                LinearProgressIndicator(
-                    progress = { if (task.progress > 0f) task.progress / 100f else 0f },
-                    modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(4.dp))
-                )
+                if (task.progress < 0f) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                else LinearProgressIndicator(progress = { task.progress / 100f }, modifier = Modifier.fillMaxWidth())
             } else if (task.state == DownloadState.COMPLETED) {
                 LinearProgressIndicator(
                     progress = { 1f },
@@ -334,7 +220,7 @@ fun DownloadTaskCard(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 when (task.state) {
-                    DownloadState.DOWNLOADING -> {
+                    DownloadState.DOWNLOADING, DownloadState.RESOLVING, DownloadState.MERGING, DownloadState.TRANSCODING -> {
                         if (task.canPause) {
                             OutlinedButton(
                                 onClick = onPause,
@@ -352,7 +238,7 @@ fun DownloadTaskCard(
                         }
                     }
                     DownloadState.PAUSED -> {
-                        if (task.canResume) {
+                        if (task.state == DownloadState.PAUSED) {
                             Button(
                                 onClick = onResume,
                                 shape = RoundedCornerShape(8.dp),

@@ -28,7 +28,7 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests, debug APK, and Android lint
-        run: bash gradlew testDebugUnitTest assembleDebug lintDebug --stacktrace --console=plain
+        run: bash gradlew testDebugUnitTest assembleDebug lintDebug --continue --stacktrace --console=plain
       - name: Verification evidence
         if: always()
         uses: actions/upload-artifact@v4

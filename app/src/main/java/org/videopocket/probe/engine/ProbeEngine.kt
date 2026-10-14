@@ -243,13 +243,17 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         )
     }
 
-    override fun download(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, progress: (Float) -> Unit): ProbeResult {
+    override fun download(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, progress: (Float) -> Unit): ProbeResult =
+        downloadWithFormat(url, info, action, height, bitrate, "auto", progress)
+
+    fun downloadWithFormat(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, outputFormat: String, progress: (Float) -> Unit): ProbeResult {
+        require(outputFormat in setOf("auto", "mp4", "mkv", "webm"))
         initialize()
         require(action != ProbeAction.INSPECT)
         require(bitrate in setOf(128, 192, 320))
         val isPlaylist = info.isPlaylist || action == ProbeAction.PLAYLIST_VIDEO || action == ProbeAction.PLAYLIST_MP3
         if (isPlaylist) {
-            return downloadPlaylist(url, info, action, height, bitrate, progress)
+            return downloadPlaylist(url, info, action, height, bitrate, outputFormat, progress)
         }
         val format = FormatPolicy.select(info, action, height)
         val estimate = info.formats.filter { it.id in format.split('+') }.mapNotNull { it.bytes }.sum()
@@ -264,7 +268,8 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 .addOption("--no-simulate").addOption("--newline")
                 .addOption("--output", File(folder, "media.%(ext)s").absolutePath)
                 .addOption("--max-filesize", "512M")
-                .addOption("--merge-output-format", "mkv")
+                .addOption("--merge-output-format", if (outputFormat == "auto") "mkv" else outputFormat)
+            if (outputFormat != "auto" && action != ProbeAction.MP3) req.addOption("--remux-video", outputFormat)
             if (action == ProbeAction.MP3) req.addOption("--extract-audio")
                 .addOption("--audio-format", "mp3").addOption("--audio-quality", "${bitrate}K")
 
@@ -342,7 +347,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                     .addOption("--audio-quality", "192K")
             } else {
                 val outExt = if (clip.format.equals("webm", ignoreCase = true)) "webm" else "mp4"
-                req.addOption("--merge-output-format", outExt)
+                req.addOption("--merge-output-format", outExt).addOption("--remux-video", outExt)
             }
 
             checkCancelled()
@@ -387,7 +392,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         }
     }
 
-    private fun downloadPlaylist(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, progress: (Float) -> Unit): ProbeResult {
+    private fun downloadPlaylist(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, outputFormat: String, progress: (Float) -> Unit): ProbeResult {
         if (StatFs(context.noBackupFilesDir.path).availableBytes < 512L * 1024 * 1024)
             throw ProbeFailure(Problem.SPACE)
         val id = UUID.randomUUID().toString()
@@ -407,9 +412,10 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                     .addOption("--audio-quality", "${bitrate}K")
             } else {
                 req.addOption("--format", "bestvideo[height<=$height]+bestaudio/best[height<=$height]/best")
-                    .addOption("--merge-output-format", "mkv")
+                    .addOption("--merge-output-format", if (outputFormat == "auto") "mkv" else outputFormat)
             }
 
+            if (outputFormat != "auto" && action !in setOf(ProbeAction.MP3, ProbeAction.PLAYLIST_MP3)) req.addOption("--remux-video", outputFormat)
             checkCancelled()
             engine.execute(req, id) { _, _, _ -> progress(-1f) }
             checkCancelled()

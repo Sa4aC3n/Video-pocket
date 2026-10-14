@@ -34,7 +34,7 @@ object AppSettings {
 
     var themeMode by mutableStateOf(ThemeMode.SYSTEM)
         private set
-    var isArabic by mutableStateOf(false)
+    var isArabic by mutableStateOf(true)
         private set
     var defaultQuality by mutableStateOf(DefaultQualityPreset.BEST_AVAILABLE)
         private set
@@ -53,7 +53,7 @@ object AppSettings {
             val themeStr = prefs.getString(KEY_THEME, ThemeMode.SYSTEM.name) ?: ThemeMode.SYSTEM.name
             themeMode = try { ThemeMode.valueOf(themeStr) } catch (_: Exception) { ThemeMode.SYSTEM }
 
-            isArabic = prefs.getBoolean(KEY_LANGUAGE, false)
+            isArabic = prefs.getBoolean(KEY_LANGUAGE, true)
 
             val qualityStr = prefs.getString(KEY_DEFAULT_QUALITY, DefaultQualityPreset.BEST_AVAILABLE.name)
                 ?: DefaultQualityPreset.BEST_AVAILABLE.name

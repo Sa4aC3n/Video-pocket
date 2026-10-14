@@ -20,6 +20,9 @@ import org.videopocket.probe.core.DefaultQualityPreset
 import org.videopocket.probe.core.ThemeMode
 import org.videopocket.probe.storage.StorageBreakdown
 import org.videopocket.probe.storage.StorageManager
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.videopocket.probe.storage.TempFileManager
 
 @Composable
@@ -31,7 +34,9 @@ fun SettingsScreen(
     val context = LocalContext.current
     fun t(en: String, ar: String) = if (arabic) ar else en
 
-    var storageBreakdown by remember { mutableStateOf(StorageManager.getBreakdown(context)) }
+    val scope = rememberCoroutineScope()
+    var storageBreakdown by remember { mutableStateOf(StorageBreakdown(0, 0, 0, 0, 0, 0)) }
+    LaunchedEffect(Unit) { storageBreakdown = withContext(Dispatchers.IO) { runCatching { StorageManager.getBreakdown(context) }.getOrDefault(storageBreakdown) } }
     var showClearTempConfirm by remember { mutableStateOf(false) }
 
     Column(
@@ -201,7 +206,7 @@ fun SettingsScreen(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Column {
+                    Column(Modifier.weight(1f)) {
                         Text(
                             text = t("Max Concurrent Downloads", "أقصى عدد تنزيلات متزامنة"),
                             fontWeight = FontWeight.SemiBold
@@ -393,12 +398,14 @@ fun SettingsScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        val freed = TempFileManager.cleanupTemporaryFiles(context)
-                        storageBreakdown = StorageManager.getBreakdown(context)
                         showClearTempConfirm = false
+                        scope.launch {
+                        val freed = withContext(Dispatchers.IO) { TempFileManager.cleanupTemporaryFiles(context) }
+                        storageBreakdown = withContext(Dispatchers.IO) { runCatching { StorageManager.getBreakdown(context) }.getOrDefault(storageBreakdown) }
                         val mbFreed = freed / (1024.0 * 1024.0)
                         val msg = if (arabic) "تم تنظيف %.1f ميجابايت بنجاح".format(mbFreed) else "Cleaned %.1f MB of temp files".format(mbFreed)
                         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+                        }
                     }
                 ) {
                     Text(t("Clean", "تنظيف"))

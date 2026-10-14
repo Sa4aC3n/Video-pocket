@@ -142,6 +142,9 @@ object LinkPolicy {
         if (text.length > 8192 || text.any { it.isWhitespace() || it.isISOControl() } ||
             uri.scheme?.lowercase() !in setOf("http", "https") || uri.host.isNullOrBlank() || uri.userInfo != null)
             throw ProbeFailure(Problem.INVALID_URL)
+        val host = uri.host.lowercase().trim('[', ']').trimEnd('.')
+        if (host == "localhost" || host.endsWith(".localhost") || host in setOf("::1", "0.0.0.0", "::") ||
+            host.startsWith("127.") || host.startsWith("169.254.")) throw ProbeFailure(Problem.INVALID_URL)
         return text
     }
 }

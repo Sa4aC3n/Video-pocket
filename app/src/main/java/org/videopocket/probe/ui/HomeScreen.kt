@@ -45,6 +45,7 @@ fun HomeScreen(
     fun t(en: String, ar: String) = if (arabic) ar else en
 
     var url by rememberSaveable { mutableStateOf(sharedIntent) }
+    LaunchedEffect(sharedIntent) { if (sharedIntent.isNotBlank()) url = sharedIntent }
     var playlistMode by rememberSaveable { mutableStateOf(false) }
     var selectedHeight by remember { mutableIntStateOf(1080) }
     var selectedBitrate by remember { mutableIntStateOf(192) }
@@ -533,7 +534,7 @@ fun HomeScreen(
                             onClick = {
                                 triggerDownloadWithDuplicateCheck {
                                     val action = if (media.isPlaylist) ProbeAction.PLAYLIST_VIDEO else ProbeAction.VIDEO
-                                    model.run(action, selectedHeight, selectedBitrate)
+                                    model.run(action, selectedHeight, selectedBitrate, videoFormat)
                                 }
                             },
                             enabled = !model.busy,
@@ -637,7 +638,7 @@ fun HomeScreen(
                                 Button(
                                     onClick = {
                                         triggerDownloadWithDuplicateCheck {
-                                            model.run(ProbeAction.VIDEO, selectedHeight, selectedBitrate)
+                                            model.run(ProbeAction.VIDEO, selectedHeight, selectedBitrate, videoFormat)
                                         }
                                     },
                                     enabled = !model.busy,
@@ -646,7 +647,7 @@ fun HomeScreen(
                                 ) {
                                     Icon(Icons.Default.Download, contentDescription = null)
                                     Spacer(Modifier.width(8.dp))
-                                    Text(t("Download Video (${selectedHeight}p)", "تنزيل الفيديو (${selectedHeight}p)"))
+                                    Text(if (selectedHeight > 0) t("Download Video (${selectedHeight}p)", "تنزيل الفيديو (${selectedHeight}p)") else t("Download available video", "تنزيل الفيديو المتاح"))
                                 }
                             }
                         }
@@ -838,7 +839,7 @@ fun HomeScreen(
                 selectedHeight = height
                 videoFormat = fmt
                 triggerDownloadWithDuplicateCheck {
-                    model.run(ProbeAction.VIDEO, height, selectedBitrate)
+                    model.run(ProbeAction.VIDEO, height, selectedBitrate, fmt)
                 }
             }
         )

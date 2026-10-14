@@ -27,314 +27,96 @@ import org.videopocket.probe.core.PocketLibraryManager
 import org.videopocket.probe.storage.StorageBreakdown
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.semantics.*
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(
-    model: ProbeModel,
-    arabic: Boolean,
-    onNavigateHome: () -> Unit,
-    onProcess: (PocketLibraryItem) -> Unit
-) {
+fun LibraryScreen(model: ProbeModel, arabic: Boolean, onNavigateHome: () -> Unit, onProcess: (PocketLibraryItem) -> Unit) {
     val context = LocalContext.current
     fun t(en: String, ar: String) = if (arabic) ar else en
-
-    var searchQuery by rememberSaveable { mutableStateOf("") }
-    var selectedFilter by rememberSaveable { mutableStateOf("all") }
-    var sortBy by rememberSaveable { mutableStateOf("newest") }
-
-    var renameItemTarget by remember { mutableStateOf<PocketLibraryItem?>(null) }
-    var deleteItemTarget by remember { mutableStateOf<PocketLibraryItem?>(null) }
-
-    val rawItems = model.libraryItems
-
-    val filteredItems = remember(rawItems, searchQuery, selectedFilter, sortBy) {
-        var list = rawItems
-
-        // Filter by category
-        list = when (selectedFilter) {
-            "videos" -> list.filter { !it.isClip && !it.format.equals("mp3", true) && !it.format.equals("m4a", true) }
-            "audio" -> list.filter { it.format.equals("mp3", true) || it.format.equals("m4a", true) }
-            "clips" -> list.filter { it.isClip }
-            "favorites" -> list.filter { it.isFavorite }
-            else -> list
+    var query by rememberSaveable { mutableStateOf("") }
+    var filter by rememberSaveable { mutableStateOf("all") }
+    var sort by rememberSaveable { mutableStateOf("newest") }
+    var collection by rememberSaveable { mutableStateOf("") }
+    var rename by remember { mutableStateOf<PocketLibraryItem?>(null) }
+    var delete by remember { mutableStateOf<PocketLibraryItem?>(null) }
+    var editCollections by remember { mutableStateOf<PocketLibraryItem?>(null) }
+    val all = model.libraryItems
+    val collections = remember(all) { all.flatMap { it.collections }.distinct().sorted() }
+    val filtered = remember(all, query, filter, sort, collection) {
+        val rows = all.filter { item ->
+            val audio = item.format.lowercase(Locale.ROOT) in setOf("mp3", "m4a", "aac", "wav", "ogg", "opus", "flac")
+            (when (filter) {
+                "video" -> !audio; "audio" -> audio; "clips" -> item.isClip; "favorites" -> item.isFavorite; else -> true
+            }) && (collection.isBlank() || collection in item.collections) &&
+                listOf(item.title, item.format, item.platform.orEmpty(), item.collections.joinToString(" ")).any { it.contains(query.trim(), true) }
         }
-
-        // Search
-        if (searchQuery.isNotBlank()) {
-            val q = searchQuery.trim().lowercase(Locale.ROOT)
-            list = list.filter {
-                it.title.lowercase(Locale.ROOT).contains(q) ||
-                it.format.lowercase(Locale.ROOT).contains(q) ||
-                (it.platform?.lowercase(Locale.ROOT)?.contains(q) == true)
+        when (sort) { "title" -> rows.sortedBy { it.title.lowercase(Locale.ROOT) }; "size" -> rows.sortedByDescending { it.fileSizeBytes }; "oldest" -> rows.sortedBy { it.createdAt }; else -> rows.sortedByDescending { it.createdAt } }
+    }
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        item {
+            Text(t("Your Pocket", "مكتبتي"), style = MaterialTheme.typography.headlineMedium, modifier = Modifier.semantics { heading() })
+            Text(t("${all.size} saved files", "${all.size} ملف محفوظ"))
+        }
+        if (model.libraryError || model.libraryActionError) item {
+            Text(t("Library action failed. Existing records have been kept. Check storage and file access.", "تعذرت عملية المكتبة مع الاحتفاظ بالسجلات الموجودة. راجع المساحة وصلاحية الوصول للملفات."), color = MaterialTheme.colorScheme.error)
+        }
+        item {
+            OutlinedTextField(query, { query = it }, label = { Text(t("Search title, format or collection", "البحث بالعنوان أو التنسيق أو المجموعة")) }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        }
+        item {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("all" to t("All", "الكل"), "video" to t("Videos", "فيديو"), "audio" to t("Audio", "صوت"), "clips" to t("Clips", "مقاطع"), "favorites" to t("Favorites", "المفضلة")).forEach { (key, label) ->
+                    FilterChip(selected = filter == key, onClick = { filter = key }, label = { Text(label) })
+                }
             }
         }
-
-        // Sort
-        when (sortBy) {
-            "oldest" -> list.sortedBy { it.createdAt }
-            "title" -> list.sortedBy { it.title.lowercase(Locale.ROOT) }
-            "size" -> list.sortedByDescending { it.fileSizeBytes }
-            else -> list.sortedByDescending { it.createdAt }
+        if (collections.isNotEmpty()) item {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(selected = collection.isBlank(), onClick = { collection = "" }, label = { Text(t("All collections", "كل المجموعات")) })
+                collections.forEach { name -> FilterChip(selected = collection == name, onClick = { collection = name }, label = { Text(name) }) }
+            }
+        }
+        item {
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf("newest" to t("Newest", "الأحدث"), "oldest" to t("Oldest", "الأقدم"), "title" to t("Title", "العنوان"), "size" to t("Size", "الحجم")).forEach { (key, label) ->
+                    FilterChip(selected = sort == key, onClick = { sort = key }, label = { Text(label) })
+                }
+            }
+        }
+        if (filtered.isEmpty()) item {
+            Text(t("No matching saved media.", "لا توجد وسائط محفوظة مطابقة."))
+            TextButton(onClick = onNavigateHome) { Text(t("Add a download", "إضافة تنزيل")) }
+        }
+        items(filtered, key = { it.id }) { item ->
+            PocketItemCard(item, arabic,
+                onPlay = { PocketLibraryManager.playItem(context, item) }, onShare = { PocketLibraryManager.shareItem(context, item) },
+                onToggleFavorite = { model.toggleFavorite(item.id) }, onRename = { rename = item }, onDelete = { delete = item },
+                onProcess = { onProcess(item) }, onCollections = { editCollections = item })
         }
     }
-
-    Column(
-        Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
-        // Title Row
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column {
-                Text(
-                    text = t("Pocket", "مكتبتي"),
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "${rawItems.size} " + t("saved items", "عنصراً محفوظاً"),
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-            }
-        }
-
-        if (rawItems.isNotEmpty()) {
-            // Search Bar
-            OutlinedTextField(
-                value = searchQuery,
-                onValueChange = { searchQuery = it },
-                placeholder = { Text(t("Search saved videos, audio, clips...", "ابحث في الملفات المحفوظة...")) },
-                leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
-                trailingIcon = {
-                    if (searchQuery.isNotBlank()) {
-                        IconButton(onClick = { searchQuery = "" }) {
-                            Icon(Icons.Default.Clear, contentDescription = t("Clear", "مسح"))
-                        }
-                    }
-                },
-                shape = RoundedCornerShape(16.dp),
-                modifier = Modifier.fillMaxWidth(),
-                singleLine = true
-            )
-
-            // Filter Chips Row
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                FilterChip(
-                    selected = selectedFilter == "all",
-                    onClick = { selectedFilter = "all" },
-                    label = { Text(t("All", "الكل")) }
-                )
-                FilterChip(
-                    selected = selectedFilter == "videos",
-                    onClick = { selectedFilter = "videos" },
-                    label = { Text(t("Videos", "فيديوهات")) }
-                )
-                FilterChip(
-                    selected = selectedFilter == "audio",
-                    onClick = { selectedFilter = "audio" },
-                    label = { Text(t("Audio", "صوتيات")) }
-                )
-                FilterChip(
-                    selected = selectedFilter == "clips",
-                    onClick = { selectedFilter = "clips" },
-                    label = { Text(t("Clips", "المقاطع")) }
-                )
-                FilterChip(
-                    selected = selectedFilter == "favorites",
-                    onClick = { selectedFilter = "favorites" },
-                    label = { Text(t("Favorites", "المفضلة")) },
-                    leadingIcon = { Icon(Icons.Default.Favorite, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                )
-            }
-
-            // Sort Options Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = t("Sort by:", "ترتيب حسب:"),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.secondary
-                )
-                Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    TextButton(onClick = { sortBy = if (sortBy == "newest") "oldest" else "newest" }) {
-                        Text(if (sortBy == "oldest") t("Oldest First", "الأقدم أولاً") else t("Newest First", "الأحدث أولاً"))
-                    }
-                    TextButton(onClick = { sortBy = if (sortBy == "size") "newest" else "size" }) {
-                        Text(t("File Size", "الحجم"))
-                    }
-                }
-            }
-
-            // Items List
-            if (filteredItems.isEmpty()) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 32.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = t("No matches found for your search.", "لا توجد نتائج مطابقة لبحثك."),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.secondary
-                    )
-                }
-            } else {
-                filteredItems.forEach { item ->
-                    PocketItemCard(
-                        item = item,
-                        arabic = arabic,
-                        onPlay = { PocketLibraryManager.playItem(context, item) },
-                        onShare = { PocketLibraryManager.shareItem(context, item) },
-                        onToggleFavorite = {
-                            PocketLibraryManager.toggleFavorite(context, item.id)
-                            model.refreshLibrary()
-                        },
-                        onRename = { renameItemTarget = item },
-                        onDelete = { deleteItemTarget = item },
-                        onProcess = { onProcess(item) }
-                    )
-                }
-            }
-        } else {
-            // Empty Library State
-            Card(
-                shape = RoundedCornerShape(24.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(40.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(16.dp)
-                ) {
-                    Surface(
-                        shape = RoundedCornerShape(20.dp),
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        modifier = Modifier.size(72.dp)
-                    ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Icon(
-                                imageVector = Icons.Default.BookmarkBorder,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
-                                modifier = Modifier.size(36.dp)
-                            )
-                        }
-                    }
-                    Text(
-                        text = t("Your Pocket is empty", "مكتبتك فارغة حاليًا"),
-                        style = MaterialTheme.typography.titleLarge,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Text(
-                        text = t(
-                            "Save a video and it will appear here offline in your personal Pocket.",
-                            "حمّل مقطع الفيديو الأول وسيتم حفظه هنا بدون إنترنت في مكتبتك."
-                        ),
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                    Spacer(Modifier.height(8.dp))
-                    Button(
-                        onClick = onNavigateHome,
-                        shape = RoundedCornerShape(16.dp)
-                    ) {
-                        Icon(Icons.Default.AddLink, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(t("Paste Video Link", "لصق رابط فيديو"), fontWeight = FontWeight.Bold)
-                    }
-                }
-            }
-        }
+    rename?.let { item ->
+        var text by remember(item.id) { mutableStateOf(item.title) }
+        AlertDialog(onDismissRequest = { rename = null }, title = { Text(t("Rename in library", "تعديل الاسم في المكتبة")) },
+            text = { OutlinedTextField(text, { text = it.take(160) }, label = { Text(t("Title", "العنوان")) }) },
+            confirmButton = { TextButton(onClick = { model.renameLibraryItem(item.id, text); rename = null }, enabled = text.isNotBlank()) { Text(t("Save", "حفظ")) } },
+            dismissButton = { TextButton(onClick = { rename = null }) { Text(t("Cancel", "إلغاء")) } })
     }
-
-    // Rename Dialog
-    renameItemTarget?.let { item ->
-        var newTitle by remember { mutableStateOf(item.title) }
-        AlertDialog(
-            onDismissRequest = { renameItemTarget = null },
-            title = { Text(t("Rename Video", "إعادة تسمية الملف")) },
-            text = {
-                OutlinedTextField(
-                    value = newTitle,
-                    onValueChange = { newTitle = it },
-                    label = { Text(t("Title", "العنوان")) },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        if (newTitle.isNotBlank()) {
-                            PocketLibraryManager.renameItem(context, item.id, newTitle.trim())
-                            model.refreshLibrary()
-                        }
-                        renameItemTarget = null
-                    }
-                ) {
-                    Text(t("Save", "حفظ"))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { renameItemTarget = null }) {
-                    Text(t("Cancel", "إلغاء"))
-                }
-            }
-        )
+    delete?.let { item ->
+        AlertDialog(onDismissRequest = { delete = null }, title = { Text(t("Delete file?", "حذف الملف؟")) },
+            text = { Text(t("Permanently delete ${item.title} from your device?", "حذف ${item.title} نهائيًا من الجهاز؟")) },
+            confirmButton = { TextButton(onClick = { model.deleteLibraryItem(item.id); delete = null }) { Text(t("Delete", "حذف")) } },
+            dismissButton = { TextButton(onClick = { delete = null }) { Text(t("Cancel", "إلغاء")) } })
     }
-
-    // Delete Confirmation Dialog
-    deleteItemTarget?.let { item ->
-        AlertDialog(
-            onDismissRequest = { deleteItemTarget = null },
-            icon = { Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error) },
-            title = { Text(t("Delete from Pocket?", "حذف من المكتبة؟")) },
-            text = {
-                Text(
-                    t("Are you sure you want to permanently delete \"${item.title}\"?",
-                      "هل أنت متأكد من رغبتك في حذف \"${item.title}\" نهائيًا من جهازك؟")
-                )
-            },
-            confirmButton = {
-                Button(
-                    onClick = {
-                        PocketLibraryManager.deleteItem(context, item.id)
-                        model.refreshLibrary()
-                        deleteItemTarget = null
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
-                ) {
-                    Text(t("Delete", "حذف"))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { deleteItemTarget = null }) {
-                    Text(t("Cancel", "إلغاء"))
-                }
-            }
-        )
+    editCollections?.let { item ->
+        var names by remember(item.id) { mutableStateOf(item.collections.joinToString(", ")) }
+        AlertDialog(onDismissRequest = { editCollections = null }, title = { Text(t("Collections", "المجموعات")) },
+            text = { OutlinedTextField(names, { names = it.take(500) }, label = { Text(t("Names separated by commas", "أسماء تفصلها فاصلة")) }) },
+            confirmButton = { TextButton(onClick = {
+                model.updateCollections(item.id, names.split(',', '،').map { it.trim().take(50) }.filter { it.isNotBlank() }.distinct()); editCollections = null
+            }) { Text(t("Save", "حفظ")) } },
+            dismissButton = { TextButton(onClick = { editCollections = null }) { Text(t("Cancel", "إلغاء")) } })
     }
 }
 
@@ -347,14 +129,15 @@ fun PocketItemCard(
     onToggleFavorite: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
-    onProcess: () -> Unit
+    onProcess: () -> Unit,
+    onCollections: () -> Unit
 ) {
     fun t(en: String, ar: String) = if (arabic) ar else en
     var expandedMenu by remember { mutableStateOf(false) }
 
     val formattedSize = remember(item.fileSizeBytes) {
         val mb = item.fileSizeBytes / (1024.0 * 1024.0)
-        if (mb >= 1000) String.format(Locale.US, "%.2f GB", mb / 1024.0)
+        if (item.fileSizeBytes <= 0) "—" else if (mb >= 1000) String.format(Locale.US, "%.2f GB", mb / 1024.0)
         else String.format(Locale.US, "%.1f MB", mb)
     }
 
@@ -509,6 +292,7 @@ fun PocketItemCard(
                                 leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },
                                 onClick = { expandedMenu = false; onProcess() }
                             )
+                            DropdownMenuItem(text = { Text(t("Collections", "المجموعات")) }, onClick = { expandedMenu = false; onCollections() })
                             DropdownMenuItem(
                                 text = { Text(t("Rename", "إعادة تسمية")) },
                                 leadingIcon = { Icon(Icons.Default.Edit, contentDescription = null) },

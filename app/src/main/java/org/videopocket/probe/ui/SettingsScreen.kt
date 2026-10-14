@@ -331,7 +331,7 @@ fun SettingsScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = t("Total Video Pocket Usage", "إجمالي مساحة التطبيق"),
+                        text = t("Indexed media and temporary files", "الوسائط المفهرسة والملفات المؤقتة"),
                         fontWeight = FontWeight.Bold
                     )
                     Text(
@@ -362,7 +362,7 @@ fun SettingsScreen(
         ) {
             Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text(
-                    text = "Video Pocket v2.0",
+                    text = "Video Pocket ${org.videopocket.probe.BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )

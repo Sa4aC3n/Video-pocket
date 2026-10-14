@@ -261,7 +261,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
         queueManager.enqueue(DownloadTask(url = url, title = media.title,
             platform = normalizedMetadata?.platform ?: media.extractor.orEmpty(),
             quality = if (audio) "${bitrate} kbps output" else if (height > 0) "${height}p" else "Source quality",
-            format = outputFormat, height = height, bitrate = bitrate, isAudioOnly = audio, rawInfo = media))
+            format = if (audio) "mp3" else outputFormat, height = height, bitrate = bitrate, isAudioOnly = audio, rawInfo = media))
     }
 
     fun runClip(clip: ClipRequest) {
@@ -281,7 +281,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
         withContext(Dispatchers.IO) { runCatching { reportFile.writeText(text) } }
     }
 
-    fun report(): String = JSONObject().put("app", "VideoPocket 2.0")
+    fun report(): String = JSONObject().put("app", "Video Pocket ${BuildConfig.VERSION_NAME}")
         .put("generatedAt", Instant.now().toString()).put("runtime", runtime)
         .put("scope", "Foreground downloads, persistent queue and local media processing")
         .put("queue", JSONArray(queueManager.tasks.map { JSONObject().put("state", it.state.name).put("bytes", it.bytes).put("error", it.error ?: "") }))

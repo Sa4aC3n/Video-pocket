@@ -396,7 +396,7 @@ fun HomeScreen(
                         )
                         val titleText = model.resolverError?.let { err ->
                             if (arabic) err.type.defaultArabic else err.type.defaultMessage
-                        } ?: if (arabic) prob.name else prob.name
+                        } ?: problemMessage(prob.name, arabic)
                         Text(
                             text = titleText,
                             color = MaterialTheme.colorScheme.onErrorContainer,
@@ -406,6 +406,9 @@ fun HomeScreen(
                     }
 
                     val userMessage = model.resolverError?.userMessage(arabic)
+                    if (model.initErrorDetail == NativeRuntimePolicy.PAGE_SIZE_MESSAGE) {
+                        Text(t("This device uses a memory page size that the bundled media engine does not support yet.", "يستخدم الجهاز حجم صفحات ذاكرة لا يدعمه محرك الوسائط المرفق حاليًا."))
+                    }
                     if (!userMessage.isNullOrBlank()) {
                         Text(
                             text = userMessage,

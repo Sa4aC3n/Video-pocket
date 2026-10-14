@@ -38,6 +38,8 @@ class LocalMediaProcessor(private val context: Context) {
         if (cancelled.get() || Thread.currentThread().isInterrupted) throw ProcessingFailure("CANCELLED")
     }
     private fun initialize() {
+        if (!NativeRuntimePolicy.supportsPageSize(android.system.Os.sysconf(android.system.OsConstants._SC_PAGESIZE)))
+            throw ProcessingFailure("PAGE_SIZE_UNSUPPORTED")
         FFmpeg.getInstance().init(context)
         if (!binary.isFile || !binary.canExecute()) throw ProcessingFailure("ENGINE_UNAVAILABLE")
     }
@@ -168,7 +170,7 @@ class LocalMediaProcessor(private val context: Context) {
             for (attempt in 0..1) {
                 checkCancelled()
                 onProgress(ProcessingUpdate(null, if (attempt == 0) "ENCODING" else "OPTIMIZING"))
-                val args = mutableListOf("-y", "-i", input.path)
+                val args = mutableListOf("-y", "-protocol_whitelist", "file,pipe", "-i", input.path)
                 if (request.mode == ProcessingMode.TRIM) args.addAll(listOf("-ss", String.format(Locale.US, "%.6f", request.startSeconds), "-t", String.format(Locale.US, "%.6f", seconds)))
                 args.addAll(listOf("-map_metadata", "-1", "-map_chapters", "-1"))
                 if (audioOnly) {
@@ -203,7 +205,7 @@ class LocalMediaProcessor(private val context: Context) {
             checkCancelled()
             onProgress(ProcessingUpdate(null, "VALIDATING"))
             val actual = inspect(output)
-            if (output.length() <= 0 || audioOnly && (!actual.audio || actual.video) || !audioOnly && !actual.video ||
+            if (output.length() <= 0 || audioOnly && (!actual.audio || actual.video) || !audioOnly && !actual.video || source.audio && !actual.audio ||
                 kotlin.math.abs(actual.seconds - seconds) > maxOf(1.0, seconds * 0.05)) throw ProcessingFailure("INVALID_OUTPUT")
             if (request.mode == ProcessingMode.COMPRESS && output.length() >= input.length()) throw ProcessingFailure("NO_SIZE_REDUCTION")
             synchronized(lock) { checkCancelled(); publishing = true }

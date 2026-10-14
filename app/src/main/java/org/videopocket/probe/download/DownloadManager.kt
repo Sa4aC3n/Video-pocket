@@ -52,7 +52,7 @@ data class DownloadTask(
     val platform: String,
     val quality: String,
     val format: String,
-    val height: Int = 1080,
+    val height: Int = -1,
     val bitrate: Int = 192,
     val isAudioOnly: Boolean = false,
     val isClip: Boolean = false,
@@ -122,7 +122,7 @@ class DownloadQueueManager(
         if (closed || tasks.any { it.id == task.id ||
             it.state in ACTIVE_STATES + setOf(DownloadState.QUEUED, DownloadState.PAUSED) &&
             it.url == task.url && it.height == task.height && it.format == task.format &&
-            it.isAudioOnly == task.isAudioOnly && it.clipRequest == task.clipRequest }) return
+            it.isAudioOnly == task.isAudioOnly && it.bitrate == task.bitrate && it.clipRequest == task.clipRequest }) return
         val validated = try { task.copy(url = LinkPolicy.validate(task.url)) }
         catch (_: Exception) { task.copy(state = DownloadState.FAILED, error = Problem.INVALID_URL.name) }
         tasks = listOf(validated) + tasks
@@ -192,7 +192,7 @@ class DownloadQueueManager(
         try {
             val media = task.rawInfo ?: withContext(Dispatchers.IO) { engine.inspect(task.url) }
             if (cancelled()) throw ProbeFailure(Problem.CANCELED)
-            updateTask(task.id) { it.copy(state = DownloadState.DOWNLOADING) }
+            updateTask(task.id) { it.copy(state = DownloadState.DOWNLOADING, title = media.title) }
             val progress: (Float) -> Unit = { percent ->
                 scope.launch {
                     if (!cancelled()) {
@@ -214,10 +214,19 @@ class DownloadQueueManager(
                         media.isPlaylist -> ProbeAction.PLAYLIST_VIDEO
                         else -> ProbeAction.VIDEO
                     }
-                    engine.downloadWithFormat(task.url, media, action, if (task.height < 0) media.defaultHeight else task.height, task.bitrate, task.format, progress)
+                    engine.downloadWithFormat(task.url, media, action, if (task.height < 0) media.heights.maxOrNull() ?: 0 else task.height,
+                        task.bitrate, if (task.isAudioOnly) "auto" else task.format, progress)
                 }
                 check(downloaded.passed && !downloaded.outputUri.isNullOrBlank())
-                LibraryIndexer.index(application, downloaded, media, task.url, task.platform, task.clipRequest)
+                try {
+                    LibraryIndexer.index(application, downloaded, media, task.url, task.platform, task.clipRequest)
+                } catch (failure: Exception) {
+                    // Only this operation's newly published rows can be rolled back.
+                    downloaded.outputUris.ifEmpty { listOfNotNull(downloaded.outputUri) }.distinct().forEach { uri ->
+                        runCatching { application.contentResolver.delete(android.net.Uri.parse(uri), null, null) }
+                    }
+                    throw failure
+                }
                 downloaded
             }
             updateTask(task.id) { it.copy(state = DownloadState.COMPLETED, progress = 100f, outputUri = result.outputUri, bytes = result.bytes) }

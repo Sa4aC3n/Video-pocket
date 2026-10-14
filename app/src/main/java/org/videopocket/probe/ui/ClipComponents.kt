@@ -422,6 +422,11 @@ fun ClipPreviewPlayer(
     var videoViewRef by remember { mutableStateOf<VideoView?>(null) }
     var playerError by remember { mutableStateOf(false) }
 
+    DisposableEffect(videoViewRef) {
+        val view = videoViewRef
+        onDispose { view?.stopPlayback() }
+    }
+
     LaunchedEffect(isPlaying) {
         while (isPlaying) {
             val vv = videoViewRef
@@ -487,16 +492,25 @@ fun ClipPreviewPlayer(
                                     ViewGroup.LayoutParams.MATCH_PARENT,
                                     ViewGroup.LayoutParams.MATCH_PARENT
                                 )
-                                setVideoURI(Uri.parse(streamUrl))
                                 setOnPreparedListener { mp ->
                                     mp.isLooping = false
                                     seekTo((startSeconds * 1000).toInt())
                                 }
                                 setOnErrorListener { _, _, _ ->
                                     playerError = true
+                                    isPlaying = false
                                     true
                                 }
+                                setOnCompletionListener { isPlaying = false }
                                 videoViewRef = this
+                            }
+                        },
+                        update = { view ->
+                            if (view.tag != streamUrl) {
+                                view.tag = streamUrl
+                                playerError = false
+                                isPlaying = false
+                                view.setVideoURI(Uri.parse(streamUrl))
                             }
                         },
                         modifier = Modifier.fillMaxSize()
@@ -534,6 +548,7 @@ fun ClipPreviewPlayer(
                         }
                     }
                 }
+                if (playerError) Text(t("Preview unavailable for this stream. You can try the saved file after downloading.", "تعذرت معاينة هذا البث. يمكنك تجربة الملف المحفوظ بعد التنزيل."), color = MaterialTheme.colorScheme.error)
             } else {
                 Surface(
                     shape = RoundedCornerShape(12.dp),
@@ -549,7 +564,7 @@ fun ClipPreviewPlayer(
                     ) {
                         Icon(Icons.Default.Info, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
                         Text(
-                            text = t("Direct stream preview will play smoothly upon clip generation.", "المعاينة البصرية متاحة مباشرة، وسيبدأ التحميل عند النقر."),
+                            text = t("No playable preview URL was provided by this source.", "لم يوفر المصدر رابطًا صالحًا للمعاينة."),
                             style = MaterialTheme.typography.bodySmall
                         )
                     }

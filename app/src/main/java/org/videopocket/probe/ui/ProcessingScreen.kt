@@ -163,6 +163,7 @@ private fun processingMessage(code: String, arabic: Boolean): String {
         "DRM_UNSUPPORTED" -> "Protected media cannot be processed." to "لا يمكن معالجة الوسائط المحمية."
         "MISSING_TRACK" -> "This file does not have the required video or audio track." to "الملف لا يحتوي على مسار الفيديو أو الصوت المطلوب."
         "FORMAT_UNAVAILABLE", "ENGINE_UNAVAILABLE" -> "No verified encoder is available for this operation." to "لا يوجد برنامج ترميز تم التحقق منه لهذه العملية."
+        "PAGE_SIZE_UNSUPPORTED" -> "This media engine requires 4 KB memory pages. This device needs an updated native engine." to "يتطلب محرك الوسائط صفحات ذاكرة بحجم ٤ كيلوبايت. يحتاج هذا الجهاز إلى إصدار متوافق من المحرك."
         "TIMEOUT" -> "Processing timed out. Try a shorter clip or smaller preset." to "انتهت مهلة المعالجة. جرّب مقطعًا أقصر أو إعدادًا أصغر."
         else -> "Processing failed; original kept. Try another file or format." to "تعذرت المعالجة وتم الاحتفاظ بالأصل. جرّب ملفًا أو تنسيقًا آخر."
     }

@@ -346,9 +346,30 @@ fun StorageManagerDialog(
 ) {
     val context = LocalContext.current
     fun t(en: String, ar: String) = if (arabic) ar else en
-    var breakdown by remember { mutableStateOf(StorageManager.getBreakdown(context)) }
+    var breakdown by remember { mutableStateOf(org.videopocket.probe.storage.StorageBreakdown(0, 0, 0, 0, 0, 0)) }
     var freedStatus by remember { mutableStateOf("") }
+    var storageBusy by remember { mutableStateOf(true) }
     val scope = rememberCoroutineScope()
+    LaunchedEffect(Unit) {
+        try { breakdown = withContext(Dispatchers.IO) { StorageManager.getBreakdown(context) } }
+        catch (_: Exception) { freedStatus = t("Unable to read storage usage.", "تعذر قراءة مساحة التخزين.") }
+        finally { storageBusy = false }
+    }
+    fun cleanStorage(cache: Boolean) {
+        if (storageBusy) return
+        storageBusy = true
+        scope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) {
+                    val freed = if (cache) StorageManager.clearCache(context) else TempFileManager.cleanupTemporaryFiles(context)
+                    freed to StorageManager.getBreakdown(context)
+                }
+                breakdown = result.second
+                freedStatus = t("Freed ${breakdown.formatBytes(result.first)}", "تم تحرير ${breakdown.formatBytes(result.first)}")
+            } catch (_: Exception) { freedStatus = t("Storage operation failed; try again.", "تعذرت عملية التخزين؛ حاول مجددًا.") }
+            finally { storageBusy = false }
+        }
+    }
 
     Dialog(onDismissRequest = onDismiss) {
         Surface(
@@ -375,14 +396,15 @@ fun StorageManagerDialog(
                     }
                 }
 
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (storageBusy) LinearProgressIndicator(Modifier.fillMaxWidth())
+                else Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     StorageItemRow(t("Downloaded Videos", "مقاطع الفيديو"), breakdown.formatBytes(breakdown.videoBytes))
                     StorageItemRow(t("Audio Files", "الملفات الصوتية"), breakdown.formatBytes(breakdown.audioBytes))
                     StorageItemRow(t("Saved Clips", "المقاطع المقصوصة"), breakdown.formatBytes(breakdown.clipBytes))
                     StorageItemRow(t("App Cache", "الذاكرة المؤقتة"), breakdown.formatBytes(breakdown.cacheBytes))
                     StorageItemRow(t("Temporary Files", "الملفات المؤقتة"), breakdown.formatBytes(breakdown.tempBytes))
                     HorizontalDivider()
-                    StorageItemRow(t("Total Used", "إجمالي المساحة المستخدمة"), breakdown.formatBytes(breakdown.totalBytes), isBold = true)
+                    StorageItemRow(t("Indexed media and temporary files", "الوسائط المفهرسة والملفات المؤقتة"), breakdown.formatBytes(breakdown.totalBytes), isBold = true)
                 }
 
                 if (freedStatus.isNotBlank()) {
@@ -399,21 +421,15 @@ fun StorageManagerDialog(
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     OutlinedButton(
-                        onClick = {
-                            val freed = TempFileManager.cleanupTemporaryFiles(context)
-                            breakdown = StorageManager.getBreakdown(context)
-                            freedStatus = t("Cleaned temporary files (${breakdown.formatBytes(freed)})", "تم تنظيف الملفات المؤقتة (${breakdown.formatBytes(freed)})")
-                        },
+                        onClick = { cleanStorage(false) },
+                        enabled = !storageBusy,
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(t("Clean Temp", "مسح المؤقت"))
                     }
                     Button(
-                        onClick = {
-                            val freed = StorageManager.clearCache(context)
-                            breakdown = StorageManager.getBreakdown(context)
-                            freedStatus = t("Cache cleared (${breakdown.formatBytes(freed)})", "تم مسح الذاكرة المؤقتة (${breakdown.formatBytes(freed)})")
-                        },
+                        onClick = { cleanStorage(true) },
+                        enabled = !storageBusy,
                         modifier = Modifier.weight(1f)
                     ) {
                         Text(t("Clear Cache", "مسح الكاش"))
@@ -519,6 +535,7 @@ fun SubtitleCenterDialog(
                                     }
                                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                         FilledTonalButton(
+                                            enabled = exportingLang == null && sub.format.lowercase() in setOf("srt", "vtt"),
                                             onClick = {
                                                 exportingLang = sub.languageCode
                                                 scope.launch {
@@ -533,6 +550,7 @@ fun SubtitleCenterDialog(
                                             Text("SRT", style = MaterialTheme.typography.labelSmall)
                                         }
                                         FilledTonalButton(
+                                            enabled = exportingLang == null && sub.format.lowercase() in setOf("srt", "vtt"),
                                             onClick = {
                                                 exportingLang = sub.languageCode
                                                 scope.launch {

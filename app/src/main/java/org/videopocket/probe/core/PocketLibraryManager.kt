@@ -152,28 +152,35 @@ object PocketLibraryManager {
 
     fun playItem(context: Context, item: PocketLibraryItem) {
         try {
-            val mime = if (item.format.equals("mp3", true) || item.format.equals("m4a", true)) "audio/*" else "video/*"
+            val mime = context.contentResolver.getType(Uri.parse(item.uriString)) ?: MediaTypes.fallbackMime(item.format)
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(Uri.parse(item.uriString), mime)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
-        } catch (_: Exception) {}
+        } catch (_: Exception) { showOpenFailure(context) }
     }
 
     fun shareItem(context: Context, item: PocketLibraryItem) {
         try {
             val uri = Uri.parse(item.uriString)
-            val mime = if (item.format.equals("mp3", true) || item.format.equals("m4a", true)) "audio/*" else "video/*"
+            val mime = context.contentResolver.getType(uri) ?: MediaTypes.fallbackMime(item.format)
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = mime
                 putExtra(Intent.EXTRA_STREAM, uri)
                 putExtra(Intent.EXTRA_TITLE, item.title)
+                clipData = android.content.ClipData.newRawUri(item.title, uri)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(Intent.createChooser(shareIntent, item.title).apply {
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             })
-        } catch (_: Exception) {}
+        } catch (_: Exception) { showOpenFailure(context) }
+    }
+
+    private fun showOpenFailure(context: Context) {
+        android.widget.Toast.makeText(context,
+            if (AppSettings.isArabic) "تعذر فتح الملف. تحقق من وجوده ومن تثبيت مشغل متوافق." else "Unable to open file. Check that it exists and a compatible player is installed.",
+            android.widget.Toast.LENGTH_LONG).show()
     }
 }

@@ -28,7 +28,9 @@ jobs:
           log-accepted-android-sdk-licenses: false
       - uses: gradle/actions/setup-gradle@v4
       - name: Unit tests, application and test APKs, and Android lint
-        run: bash gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest lintDebug --continue --stacktrace --console=plain
+        run: bash gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug lintRelease --continue --stacktrace --console=plain
+      - name: Audit packaged native alignment
+        run: node scripts/check-native.mjs app/build/outputs/apk/release/app-release-unsigned.apk > app/build/reports/native-alignment.json
       - name: Verification evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -38,6 +40,7 @@ jobs:
             app/build/reports/
             app/build/test-results/
             app/build/outputs/apk/debug/
+            app/build/outputs/apk/release/
           if-no-files-found: warn
 
   device-smoke:
@@ -66,7 +69,7 @@ jobs:
           ram-size: 2048M
           emulator-boot-timeout: 300
           disable-animations: true
-          script: bash gradlew connectedDebugAndroidTest --stacktrace --console=plain
+          script: bash scripts/verify-device.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -74,4 +77,5 @@ jobs:
           path: |
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
+            app/build/reports/device/
           if-no-files-found: warn

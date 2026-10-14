@@ -46,7 +46,7 @@ fun LibraryScreen(model: ProbeModel, arabic: Boolean, onNavigateHome: () -> Unit
     val collections = remember(all) { all.flatMap { it.collections }.distinct().sorted() }
     val filtered = remember(all, query, filter, sort, collection) {
         val rows = all.filter { item ->
-            val audio = item.format.lowercase(Locale.ROOT) in setOf("mp3", "m4a", "aac", "wav", "ogg", "opus", "flac")
+            val audio = org.videopocket.probe.core.MediaTypes.isAudio(item.format)
             (when (filter) {
                 "video" -> !audio; "audio" -> audio; "clips" -> item.isClip; "favorites" -> item.isFavorite; else -> true
             }) && (collection.isBlank() || collection in item.collections) &&
@@ -177,7 +177,7 @@ fun PocketItemCard(
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = if (item.isClip) Icons.Default.ContentCut
-                                else if (item.format.equals("mp3", true) || item.format.equals("m4a", true)) Icons.Default.Audiotrack
+                                else if (org.videopocket.probe.core.MediaTypes.isAudio(item.format)) Icons.Default.Audiotrack
                                 else Icons.Default.Movie,
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.onPrimaryContainer,

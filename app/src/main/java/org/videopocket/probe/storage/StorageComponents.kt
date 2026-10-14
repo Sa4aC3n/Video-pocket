@@ -85,7 +85,7 @@ object StorageManager {
             val bytes = item.fileSizeBytes
             when {
                 item.isClip -> clips += bytes
-                item.format.equals("mp3", true) || item.format.equals("m4a", true) -> audios += bytes
+                org.videopocket.probe.core.MediaTypes.isAudio(item.format) -> audios += bytes
                 else -> videos += bytes
             }
         }

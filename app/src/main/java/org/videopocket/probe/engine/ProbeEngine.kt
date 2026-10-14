@@ -66,6 +66,31 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         publishing = true
     }
 
+    /** Bounds disk use and stalled native work, including playlist downloads between callbacks. */
+    private fun <T> withResourceGuard(id: String, timeoutMinutes: Long = 60, block: () -> T): T {
+        val failure = java.util.concurrent.atomic.AtomicReference<Problem?>(null)
+        val deadline = System.nanoTime() + java.util.concurrent.TimeUnit.MINUTES.toNanos(timeoutMinutes)
+        val guard = WATCHDOG.scheduleWithFixedDelay({
+            val reason = when {
+                runCatching { StatFs(context.noBackupFilesDir.path).availableBytes < 64L * 1024 * 1024 }.getOrDefault(false) -> Problem.SPACE
+                System.nanoTime() >= deadline -> Problem.NETWORK
+                else -> null
+            }
+            if (reason != null) synchronized(operationLock) {
+                if (activeProcessId == id && !publishing) {
+                    failure.compareAndSet(null, reason)
+                    runCatching { engine.destroyProcessById(id) }
+                }
+            }
+        }, 1, 1, java.util.concurrent.TimeUnit.SECONDS)
+        try {
+            return block().also { failure.get()?.let { throw ProbeFailure(it) } }
+        } catch (error: Exception) {
+            failure.get()?.let { throw ProbeFailure(it) }
+            throw error
+        } finally { guard.cancel(false) }
+    }
+
     @Synchronized fun initialize(): JSONObject {
         cachedInitResult?.let {
             state = EngineState.READY
@@ -78,6 +103,8 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             }
             state = EngineState.INITIALIZING
             try {
+                if (!NativeRuntimePolicy.supportsPageSize(Os.sysconf(OsConstants._SC_PAGESIZE)))
+                    throw ProbeFailure(Problem.ENGINE, NativeRuntimePolicy.PAGE_SIZE_MESSAGE)
                 FFmpeg.getInstance().init(context)
                 engine.init(context)
                 val targetFile = File(context.noBackupFilesDir, "youtubedl-android/yt-dlp/yt-dlp")
@@ -150,7 +177,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         begin(id)
         val response = try {
             checkCancelled()
-            engine.execute(req, id, null).also { checkCancelled() }
+            withResourceGuard(id, 10) { engine.execute(req, id, null) }.also { checkCancelled() }
         } finally { activeProcessId = null }
         val json = JSONObject(response.out)
         if (json.optBoolean("has_drm")) throw ProbeFailure(Problem.UNSUPPORTED)
@@ -274,7 +301,9 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 .addOption("--audio-format", "mp3").addOption("--audio-quality", "${bitrate}K")
 
             checkCancelled()
-            engine.execute(req, id) { percent, _, _ -> progress(if (percent.isFinite() && percent >= 0) percent.coerceAtMost(100f) else -1f) }
+            withResourceGuard(id) {
+                engine.execute(req, id) { percent, _, _ -> progress(if (percent.isFinite() && percent >= 0) percent.coerceAtMost(100f) else -1f) }
+            }
             checkCancelled()
             progress(-1f)
             val output = folder.listFiles()?.singleOrNull { it.isFile && it.extension in setOf("mp4", "webm", "mkv", "mp3", "m4a", "mov") }
@@ -351,10 +380,10 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             }
 
             checkCancelled()
-            engine.execute(req, id) { percent, _, _ ->
+            withResourceGuard(id) { engine.execute(req, id) { percent, _, _ ->
                 val p = if (percent.isFinite() && percent >= 0) percent.coerceAtMost(100f) else -1f
                 progress(p, "Downloading segment")
-            }
+            } }
             checkCancelled()
             progress(-1f, "Validating & saving clip...")
 
@@ -370,7 +399,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 val s = totalSec % 60
                 return String.format(java.util.Locale.US, "%02dm%02ds", m, s)
             }
-            val qualityTag = if (clip.isAudioOnly) "audio" else "${clip.height}p"
+            val qualityTag = if (clip.isAudioOnly) "audio" else "clip"
             val displayBase = "${safeTitle}_${formatCompact(clip.startSeconds)}-${formatCompact(clip.endSeconds)}_${qualityTag}"
             validateOutput(output, if (clip.isAudioOnly) ProbeAction.MP3 else ProbeAction.VIDEO)
             beginPublishing()
@@ -417,7 +446,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
 
             if (outputFormat != "auto" && action !in setOf(ProbeAction.MP3, ProbeAction.PLAYLIST_MP3)) req.addOption("--remux-video", outputFormat)
             checkCancelled()
-            engine.execute(req, id) { _, _, _ -> progress(-1f) }
+            withResourceGuard(id) { engine.execute(req, id) { _, _, _ -> progress(-1f) } }
             checkCancelled()
             val outputs = folder.listFiles()?.filter { it.isFile && it.extension in setOf("mp4", "webm", "mkv", "mp3", "m4a", "mov") }?.sortedBy { it.name }
                 ?: emptyList()
@@ -512,6 +541,9 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
     companion object {
         @Volatile private var cachedInitResult: JSONObject? = null
         private val initLock = Any()
+        private val WATCHDOG = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { runnable ->
+            Thread(runnable, "download-watchdog").apply { isDaemon = true }
+        }
 
         @Volatile var state: EngineState = EngineState.NOT_INITIALIZED
             private set

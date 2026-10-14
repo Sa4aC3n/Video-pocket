@@ -9,6 +9,8 @@ import com.yausername.ffmpeg.FFmpeg
 import org.junit.Assert.*
 import org.junit.Test
 import org.junit.runner.RunWith
+import org.junit.FixMethodOrder
+import org.junit.runners.MethodSorters
 import org.videopocket.probe.core.PocketLibraryManager
 import org.videopocket.probe.core.ProbeAction
 import org.videopocket.probe.engine.ProbeEngine
@@ -20,16 +22,17 @@ import java.util.UUID
 import java.util.concurrent.TimeUnit
 
 @RunWith(AndroidJUnit4::class)
+@FixMethodOrder(MethodSorters.NAME_ASCENDING)
 class DeviceSmokeTest {
     private val context get() = ApplicationProvider.getApplicationContext<Context>()
 
-    @Test fun activityLaunchKeepsDownloaderUninitialized() {
+    @Test fun a_activityLaunchKeepsDownloaderUninitialized() {
         ActivityScenario.launch(MainActivity::class.java).use { scenario ->
             scenario.onActivity { assertFalse(ProbeEngine.isInitialized) }
         }
     }
 
-    @Test fun actualBundledEncoderProducesEditableMediaAndKeepsOriginal() {
+    @Test fun b_actualBundledEncoderProducesEditableMediaAndKeepsOriginal() {
         val engine = LocalMediaProcessor(context)
         val capabilities = engine.capabilities()
         assertTrue("Bundled MP4 encoder must pass real device probe", "mp4" in capabilities.formats(false))
@@ -58,6 +61,7 @@ class DeviceSmokeTest {
             assertEquals(before, hash(original))
             assertTrue(progress.isNotEmpty())
             assertEquals(100f, progress.last(), 0f)
+            assertTrue(progress.dropLast(1).all { it in 0f..99f })
             val trim = LocalMediaProcessor(context).run(ProcessingRequest(original, "instrumented-trim", ProcessingMode.TRIM,
                 startSeconds = 1.0, endSeconds = 2.5)) {}
             uris.add(trim.media.uri)
@@ -65,6 +69,24 @@ class DeviceSmokeTest {
             val audio = LocalMediaProcessor(context).run(ProcessingRequest(original, "instrumented-audio", ProcessingMode.EXTRACT_AUDIO, format = "m4a")) {}
             uris.add(audio.media.uri)
             assertTrue(audio.media.isAudio)
+            assertEquals(before, hash(original))
+            if ("webm" in capabilities.formats(false)) {
+                val converted = LocalMediaProcessor(context).run(ProcessingRequest(original, "instrumented-conversion", ProcessingMode.CONVERT, format = "webm")) {}
+                uris.add(converted.media.uri)
+                assertEquals("video/webm", converted.media.mime)
+                assertTrue((converted.media.durationMs ?: 0) > 0)
+            }
+            val runningCancellation = LocalMediaProcessor(context)
+            var cancelledActiveProcess = false
+            try {
+                runningCancellation.run(ProcessingRequest(original, "cancel-active", ProcessingMode.CONVERT)) { update ->
+                    if (update.percent != null && update.percent < 100f) {
+                        cancelledActiveProcess = runningCancellation.cancel()
+                    }
+                }
+                fail("Active cancellation was ignored")
+            } catch (failure: ProcessingFailure) { assertEquals("CANCELLED", failure.code) }
+            assertTrue("Cancellation must occur during native progress", cancelledActiveProcess)
             assertEquals(before, hash(original))
             val cancelled = LocalMediaProcessor(context)
             cancelled.cancel()
@@ -76,6 +98,14 @@ class DeviceSmokeTest {
             uris.forEach { runCatching { context.contentResolver.delete(Uri.parse(it), null, null) } }
             Workspaces.release(folder)
         }
+    }
+
+    @Test fun c_bundledDownloaderCanExecuteWithoutNetwork() {
+        ProbeEngine(context).initialize()
+        val request = com.yausername.youtubedl_android.YoutubeDLRequest("https://example.org")
+            .addOption("--ignore-config").addOption("--no-plugin-dirs").addOption("--version")
+        val response = com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(request)
+        assertTrue("Actual bundled version must be returned", response.out.trim().matches(Regex("[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}.*")))
     }
     private fun hash(uri: String): String {
         val digest = MessageDigest.getInstance("SHA-256")

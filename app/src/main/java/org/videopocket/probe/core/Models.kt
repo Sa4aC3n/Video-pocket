@@ -145,6 +145,15 @@ object LinkPolicy {
         val host = uri.host.lowercase().trim('[', ']').trimEnd('.')
         if (host == "localhost" || host.endsWith(".localhost") || host in setOf("::1", "0.0.0.0", "::") ||
             host.startsWith("127.") || host.startsWith("169.254.")) throw ProbeFailure(Problem.INVALID_URL)
+        if (host.contains(':') || host.matches(Regex("[0-9.]+"))) {
+            if ('%' in host || (!host.contains(':') &&
+                (host.split('.').size != 4 || host.split('.').any { it.length > 1 && it.startsWith('0') })))
+                throw ProbeFailure(Problem.INVALID_URL)
+            val address = try { java.net.InetAddress.getByName(host) } catch (_: Exception) { throw ProbeFailure(Problem.INVALID_URL) }
+            if (address.isAnyLocalAddress || address.isLoopbackAddress || address.isLinkLocalAddress || address.isSiteLocalAddress || address.isMulticastAddress ||
+                (address is java.net.Inet6Address && (address.address[0].toInt() and 0xfe) == 0xfc))
+                throw ProbeFailure(Problem.INVALID_URL)
+        }
         return text
     }
 }

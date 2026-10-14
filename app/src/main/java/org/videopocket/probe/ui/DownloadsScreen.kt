@@ -147,7 +147,7 @@ fun DownloadTaskCard(
                     color = MaterialTheme.colorScheme.surfaceVariant
                 ) {
                     Text(
-                        text = task.format.uppercase(),
+                        text = if (task.isAudioOnly) "MP3" else task.format.uppercase(),
                         style = MaterialTheme.typography.labelSmall,
                         modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                     )
@@ -207,7 +207,7 @@ fun DownloadTaskCard(
             // Error info if failed
             if (task.state == DownloadState.FAILED && !task.error.isNullOrBlank()) {
                 Text(
-                    text = "${t("Error:", "خطأ:")} ${task.error}",
+                    text = org.videopocket.probe.core.problemMessage(task.error, arabic),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.error
                 )

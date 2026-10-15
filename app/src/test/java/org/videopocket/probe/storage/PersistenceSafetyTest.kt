@@ -24,7 +24,7 @@ class PersistenceSafetyTest {
     }
     private fun item(id: String, uri: String) = PocketLibraryItem(id, "اختبار", uri, false,
         duration = "—", resolution = "—", format = "MP4", fileSizeBytes = 12345,
-        isFavorite = true, collections = listOf("تعليم"))
+        isFavorite = true, collections = listOf("تعليم"), mimeType = "video/mp4")
 
     @Test fun batchIndexRetainsExistingDataAndDeduplicatesSavedUri() {
         PocketLibraryManager.addItem(app, item("a", "content://media/1"))
@@ -32,7 +32,7 @@ class PersistenceSafetyTest {
         val loaded = PocketLibraryManager.getItems(app)
         assertEquals(2, loaded.size)
         assertEquals(setOf("b", "c"), loaded.map { it.id }.toSet())
-        assertTrue(loaded.all { it.isFavorite && it.collections == listOf("تعليم") && it.fileSizeBytes == 12345L })
+        assertTrue(loaded.all { it.isFavorite && it.collections == listOf("تعليم") && it.fileSizeBytes == 12345L && it.mimeType == "video/mp4" })
     }
     @Test fun corruptIndexIsNotSilentlyOverwritten() {
         val file = File(app.filesDir, "pocket_library.json")

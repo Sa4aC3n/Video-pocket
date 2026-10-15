@@ -79,20 +79,27 @@ class DeviceSmokeTest {
             val audio = LocalMediaProcessor(context).run(ProcessingRequest(original, "instrumented-audio", ProcessingMode.EXTRACT_AUDIO, format = "m4a")) {}
             uris.add(audio.media.uri)
             assertTrue(audio.media.isAudio)
-            assertEquals("M4A", audio.media.extension)
-            assertEquals("audio/mp4", audio.media.mime)
             val audioTracks = android.media.MediaExtractor()
+            val actualAudioTracks: List<String>
             try {
                 audioTracks.setDataSource(context, Uri.parse(audio.media.uri), null)
-                assertTrue((0 until audioTracks.trackCount).any {
-                    audioTracks.getTrackFormat(it).getString(android.media.MediaFormat.KEY_MIME) == "audio/mp4a-latm"
-                })
+                actualAudioTracks = (0 until audioTracks.trackCount).mapNotNull {
+                    audioTracks.getTrackFormat(it).getString(android.media.MediaFormat.KEY_MIME)
+                }
             } finally { audioTracks.release() }
+            evidence("audio-format.json", org.json.JSONObject().put("name", audio.media.name)
+                .put("extension", audio.media.extension).put("savedMime", audio.media.mime)
+                .put("selectedEncoder", audio.encoder).put("tracks", org.json.JSONArray(actualAudioTracks)))
+            assertEquals("M4A", audio.media.extension)
+            assertEquals("audio/mp4", audio.media.mime)
+            assertTrue("audio/mp4a-latm" in actualAudioTracks)
             assertEquals(before, hash(original))
-            if ("webm" in capabilities.formats(false)) {
-                val converted = LocalMediaProcessor(context).run(ProcessingRequest(original, "instrumented-conversion", ProcessingMode.CONVERT, format = "webm")) {}
+            val conversionFormat = capabilities.formats(false).firstOrNull { it != "mp4" }
+            if (conversionFormat != null) {
+                val converted = LocalMediaProcessor(context).run(ProcessingRequest(original, "instrumented-conversion", ProcessingMode.CONVERT, format = conversionFormat)) {}
                 uris.add(converted.media.uri)
-                assertEquals("video/webm", converted.media.mime)
+                assertEquals(conversionFormat.uppercase(java.util.Locale.ROOT), converted.media.extension)
+                assertTrue(converted.media.mime?.startsWith("video/") == true)
                 assertTrue((converted.media.durationMs ?: 0) > 0)
             }
             val runningCancellation = LocalMediaProcessor(context)
@@ -117,6 +124,7 @@ class DeviceSmokeTest {
                 .put("compressionElapsedMs", compressionMs).put("encoder", result.encoder)
                 .put("requestedLimitBytes", sizeLimit).put("cappedOutputBytes", capped.media.bytes)
                 .put("trimDurationMs", trim.media.durationMs).put("extractedAudioMime", audio.media.mime)
+                .put("convertedFormat", conversionFormat ?: org.json.JSONObject.NULL)
                 .put("originalHashPreserved", before == hash(original))
                 .put("cancelledDuringNativeProgress", cancelledActiveProcess)
                 .put("verifiedEncoders", org.json.JSONArray(capabilities.encoders.sorted()))

@@ -81,5 +81,6 @@ jobs:
           path: |
             app/build/reports/androidTests/
             app/build/outputs/androidTest-results/
+            app/build/outputs/connected_android_test_additional_output/
             app/build/reports/device/
           if-no-files-found: warn

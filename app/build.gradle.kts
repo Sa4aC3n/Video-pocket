@@ -14,6 +14,7 @@ android {
         versionName = "0.2.0-rc1"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        testInstrumentationRunnerArguments["additionalTestOutputDir"] = "/sdcard/Android/data/org.videopocket.probe/files/verification"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17

@@ -33,7 +33,7 @@ Use JDK 17, Android SDK Platform 36 and Build Tools 35.0.0. The repository pins 
 
 ```sh
 bash gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug lintRelease --continue
-# With an API 29+ emulator or compatible device attached:
+# With a disposable API 29+ emulator attached (test installation replaces app data):
 bash scripts/verify-device.sh
 # Audit the packaged libraries, including archives within the APK:
 node scripts/check-native.mjs app/build/outputs/apk/release/app-release-unsigned.apk

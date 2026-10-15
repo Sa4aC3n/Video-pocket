@@ -26,6 +26,8 @@ if adb install -r -t app/build/outputs/apk/debug/app-debug.apk; then
   adb shell wm size 1920x1200
   adb shell wm density 160
   adb shell settings put system font_scale 1.5
+  adb shell wm size > "$evidence/tablet-display.txt"
+  adb shell wm density >> "$evidence/tablet-display.txt"
   if adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk; then
     adb shell am instrument -w -r -e class org.videopocket.probe.UiRegressionTest -e tabletUi true \
       org.videopocket.probe.test/androidx.test.runner.AndroidJUnitRunner > "$evidence/tablet-ui.txt"

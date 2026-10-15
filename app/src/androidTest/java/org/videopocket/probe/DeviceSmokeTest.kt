@@ -53,9 +53,11 @@ class DeviceSmokeTest {
             uris.add(original)
             val before = hash(original)
             val progress = mutableListOf<Float>()
+            val started = android.os.SystemClock.elapsedRealtime()
             val result = engine.run(ProcessingRequest(original, "instrumented-compression", preset = CompressionPreset.SMALL_FILE)) {
                 it.percent?.let(progress::add)
             }
+            val compressionMs = android.os.SystemClock.elapsedRealtime() - started
             uris.add(result.media.uri)
             assertTrue(result.media.bytes in 1 until result.inputBytes)
             assertEquals(before, hash(original))
@@ -93,6 +95,14 @@ class DeviceSmokeTest {
             try { cancelled.run(ProcessingRequest(original, "cancelled")) {}; fail("Cancellation was ignored") }
             catch (failure: ProcessingFailure) { assertEquals("CANCELLED", failure.code) }
             assertEquals(before, hash(original))
+            evidence("processing.json", org.json.JSONObject()
+                .put("inputBytes", result.inputBytes).put("compressedBytes", result.media.bytes)
+                .put("compressionElapsedMs", compressionMs).put("encoder", result.encoder)
+                .put("trimDurationMs", trim.media.durationMs).put("extractedAudioMime", audio.media.mime)
+                .put("originalHashPreserved", before == hash(original))
+                .put("cancelledDuringNativeProgress", cancelledActiveProcess)
+                .put("verifiedEncoders", org.json.JSONArray(capabilities.encoders.sorted()))
+                .put("videoFormats", org.json.JSONArray(capabilities.formats(false))))
         } finally {
             PocketLibraryManager.getItems(context).filter { it.uriString in uris }.forEach { PocketLibraryManager.deleteItem(context, it.id) }
             uris.forEach { runCatching { context.contentResolver.delete(Uri.parse(it), null, null) } }
@@ -106,6 +116,44 @@ class DeviceSmokeTest {
             .addOption("--ignore-config").addOption("--no-plugin-dirs").addOption("--version")
         val response = com.yausername.youtubedl_android.YoutubeDL.getInstance().execute(request)
         assertTrue("Actual bundled version must be returned", response.out.trim().matches(Regex("[0-9]{4}\\.[0-9]{2}\\.[0-9]{2}.*")))
+        evidence("downloader-runtime.json", org.json.JSONObject().put("version", response.out.trim()))
+    }
+
+    @Test(timeout = 180_000) fun d_publicMediaDownloadsAndIndexesMeasuredMetadata() {
+        org.junit.Assume.assumeTrue("Live network smoke is explicitly enabled by CI",
+            androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("runPublicSmoke") == "true")
+        // Public MDN example: https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/video
+        val url = "https://developer.mozilla.org/shared-assets/videos/flower.mp4"
+        val engine = ProbeEngine(context)
+        val uris = mutableListOf<String>()
+        try {
+            val info = engine.inspect(url)
+            assertFalse(info.isPlaylist)
+            val result = engine.downloadWithFormat(url, info, ProbeAction.VIDEO, info.defaultHeight, 192, "mp4") {}
+            uris.addAll(result.outputUris.ifEmpty { listOfNotNull(result.outputUri) })
+            assertTrue(result.passed)
+            org.videopocket.probe.core.LibraryIndexer.index(context, result, info, url, "MDN public fixture")
+            val saved = org.videopocket.probe.core.SavedMedia.read(context, result.outputUri!!)
+            assertTrue(saved.bytes > 0)
+            assertTrue((saved.durationMs ?: 0) > 0)
+            assertTrue((saved.height ?: 0) > 0)
+            assertEquals("video/mp4", saved.mime)
+            val indexed = PocketLibraryManager.getItems(context).first { it.uriString == saved.uri }
+            assertEquals(saved.bytes, indexed.fileSizeBytes)
+            assertEquals("${saved.height}p", indexed.resolution)
+            evidence("public-download.json", org.json.JSONObject().put("fixture", "MDN flower.mp4")
+                .put("bytes", saved.bytes).put("durationMs", saved.durationMs)
+                .put("width", saved.width).put("height", saved.height).put("mime", saved.mime)
+                .put("elapsedMs", result.elapsedMs))
+        } finally {
+            PocketLibraryManager.getItems(context).filter { it.uriString in uris }.forEach { PocketLibraryManager.deleteItem(context, it.id) }
+            uris.forEach { runCatching { context.contentResolver.delete(Uri.parse(it), null, null) } }
+        }
+    }
+
+    private fun evidence(name: String, value: org.json.JSONObject) {
+        val folder = File(context.getExternalFilesDir(null), "verification").apply { mkdirs() }
+        File(folder, name).writeText(value.toString(2))
     }
     private fun hash(uri: String): String {
         val digest = MessageDigest.getInstance("SHA-256")

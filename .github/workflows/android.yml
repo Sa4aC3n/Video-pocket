@@ -54,6 +54,8 @@ jobs:
           available_kib=$(df -Pk / | awk 'NR==2 {print $4}')
           test "$available_kib" -ge 12582912
       - uses: reactivecircus/android-emulator-runner@v2
+        env:
+          VIDEOPOCKET_PUBLIC_SMOKE: 'true'
         with:
           api-level: 29
           arch: x86_64

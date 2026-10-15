@@ -2,7 +2,7 @@
 set -uo pipefail
 
 # Keep evidence even when a test fails. Timings describe this emulator, not a phone.
-bash gradlew connectedDebugAndroidTest --stacktrace --console=plain
+bash gradlew connectedDebugAndroidTest "-Pandroid.testInstrumentationRunnerArguments.runPublicSmoke=${VIDEOPOCKET_PUBLIC_SMOKE:-false}" --stacktrace --console=plain
 test_status=$?
 evidence=app/build/reports/device
 mkdir -p "$evidence"

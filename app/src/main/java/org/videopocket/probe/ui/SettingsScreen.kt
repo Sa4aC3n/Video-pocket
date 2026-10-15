@@ -31,6 +31,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 
 @Composable
+@OptIn(ExperimentalLayoutApi::class)
 fun SettingsScreen(
     model: ProbeModel,
     arabic: Boolean,
@@ -99,16 +100,16 @@ fun SettingsScreen(
                     )
                 }
 
-                Row(
+                FlowRow(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     ThemeMode.values().forEach { mode ->
                         FilterChip(
                             selected = AppSettings.themeMode == mode,
                             onClick = { AppSettings.setTheme(mode) },
-                            label = { Text(if (arabic) mode.arabicLabel else mode.label) },
-                            modifier = Modifier.weight(1f)
+                            label = { Text(if (arabic) mode.arabicLabel else mode.label) }
                         )
                     }
                 }

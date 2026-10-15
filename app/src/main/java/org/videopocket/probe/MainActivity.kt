@@ -320,7 +320,7 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
     fun t(en: String, ar: String) = if (arabic) ar else en
     val destinations = listOf(
         Triple(0, Icons.Default.Home, t("Home", "الرئيسية")),
-        Triple(1, Icons.Default.Download, t("Downloads", "التنزيلات")),
+        Triple(1, Icons.Default.Download, t("Queue", "التنزيلات")),
         Triple(2, Icons.Default.VideoLibrary, t("Pocket", "مكتبتي")),
         Triple(4, Icons.Default.Tune, t("Studio", "استوديو")),
         Triple(3, Icons.Default.Settings, t("Settings", "الإعدادات"))
@@ -337,7 +337,9 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                 }
             }) { insets ->
                 Row(Modifier.padding(insets).fillMaxSize()) {
-                    if (expanded) NavigationRail {
+                    if (expanded) NavigationRail(modifier = Modifier.width(
+                        if (androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f) 120.dp else 88.dp
+                    )) {
                         destinations.forEach { (id, icon, label) ->
                             NavigationRailItem(selected = selectedTab == id, onClick = { selectedTab = id },
                                 icon = { Icon(icon, contentDescription = null) }, label = { Text(label) })

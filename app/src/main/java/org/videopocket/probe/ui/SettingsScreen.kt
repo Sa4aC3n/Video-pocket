@@ -24,6 +24,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.videopocket.probe.storage.TempFileManager
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 
 @Composable
 fun SettingsScreen(
@@ -38,6 +43,20 @@ fun SettingsScreen(
     var storageBreakdown by remember { mutableStateOf(StorageBreakdown(0, 0, 0, 0, 0, 0)) }
     LaunchedEffect(Unit) { storageBreakdown = withContext(Dispatchers.IO) { runCatching { StorageManager.getBreakdown(context) }.getOrDefault(storageBreakdown) } }
     var showClearTempConfirm by remember { mutableStateOf(false) }
+    fun notificationsAllowed() = android.os.Build.VERSION.SDK_INT < 33 ||
+        androidx.core.content.ContextCompat.checkSelfPermission(context, android.Manifest.permission.POST_NOTIFICATIONS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    var notificationPermission by remember { mutableStateOf(notificationsAllowed()) }
+    val notificationRequest = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        notificationPermission = it
+    }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) notificationPermission = notificationsAllowed()
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     Column(
         Modifier
@@ -137,6 +156,23 @@ fun SettingsScreen(
                     shape = RoundedCornerShape(10.dp)
                 ) {
                     Text(if (arabic) "English" else "العربية")
+                }
+            }
+        }
+
+        if (android.os.Build.VERSION.SDK_INT >= 33) {
+            Card(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(20.dp)) {
+                Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(t("Download notifications", "إشعارات التنزيل"), style = MaterialTheme.typography.titleMedium)
+                    Text(if (notificationPermission) t("Allowed", "مسموح بها") else
+                        t("Allow notifications to see download progress outside the app.", "اسمح بالإشعارات لعرض تقدم التنزيل خارج التطبيق."))
+                    if (!notificationPermission) OutlinedButton(onClick = {
+                        notificationRequest.launch(android.Manifest.permission.POST_NOTIFICATIONS)
+                    }) { Text(t("Enable notifications", "تفعيل الإشعارات")) }
+                    TextButton(onClick = {
+                        context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
+                            .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName))
+                    }) { Text(t("System notification settings", "إعدادات إشعارات النظام")) }
                 }
             }
         }

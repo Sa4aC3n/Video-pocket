@@ -29,7 +29,7 @@ No paid APIs or cloud processing are required. Provider availability changes ind
 
 ## Build and verify
 
-Use JDK 17, Android SDK Platform 35 and Build Tools 35.0.0. The repository pins its Gradle wrapper and dependencies.
+Use JDK 17, Android SDK Platform 36 and Build Tools 35.0.0. The repository pins its Gradle wrapper and dependencies.
 
 ```sh
 bash gradlew testDebugUnitTest assembleDebug assembleDebugAndroidTest assembleRelease lintDebug lintRelease --continue
@@ -39,7 +39,7 @@ bash scripts/verify-device.sh
 node scripts/check-native.mjs app/build/outputs/apk/release/app-release-unsigned.apk
 ```
 
-The `Android verification` workflow runs on `main` and uploads Gradle reports, APKs, device-test results, screenshots and emulator startup/memory evidence. Release APKs are unsigned. Install debug builds only for testing; updates to an existing installation require the same signing key.
+The `Android verification` workflow runs on `main` and uploads Gradle reports, APKs, device-test results, screenshots and emulator startup/memory evidence on API 29 and API 36. Release APKs are unsigned. Install debug builds only for testing; updates to an existing installation require the same signing key.
 
 ## العربية
 

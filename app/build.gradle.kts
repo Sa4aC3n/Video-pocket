@@ -5,11 +5,11 @@ plugins {
 }
 android {
     namespace = "org.videopocket.probe"
-    compileSdk = 35
+    compileSdk = 36
     defaultConfig {
         applicationId = "org.videopocket.probe"
         minSdk = 29
-        targetSdk = 35
+        targetSdk = 36
         versionCode = 2
         versionName = "0.2.0-rc1"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }

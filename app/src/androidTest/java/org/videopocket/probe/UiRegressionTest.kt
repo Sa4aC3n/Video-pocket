@@ -61,6 +61,8 @@ class UiRegressionTest {
         val root = compose.onRoot().fetchSemanticsNode().boundsInRoot
         TestEvidence.output(compose.activity, prefix + if (arabic) "navigation-ar.json" else "navigation-en.json").bufferedWriter().use {
             it.write(org.json.JSONObject().put("rootWidth", root.width).put("rootHeight", root.height)
+                .put("densityDpi", compose.activity.resources.configuration.densityDpi)
+                .put("fontScale", compose.activity.resources.configuration.fontScale)
                 .put("homeX", home.center.x).put("homeY", home.center.y)
                 .put("settingsX", settings.center.x).put("settingsY", settings.center.y)
                 .put("vertical", vertical).put("tabletRun", isTabletRun()).toString(2))

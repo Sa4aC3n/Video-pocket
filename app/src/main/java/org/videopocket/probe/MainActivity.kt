@@ -284,7 +284,9 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
     fun report(): String = JSONObject().put("app", "Video Pocket ${BuildConfig.VERSION_NAME}")
         .put("generatedAt", Instant.now().toString()).put("runtime", runtime)
         .put("scope", "Foreground downloads, persistent queue and local media processing")
-        .put("queue", JSONArray(queueManager.tasks.map { JSONObject().put("state", it.state.name).put("bytes", it.bytes).put("error", it.error ?: "") }))
+        .put("queue", JSONArray(queueManager.tasks.map { JSONObject().put("state", it.state.name).put("bytes", it.bytes)
+            .put("elapsedMs", it.elapsedMs ?: JSONObject.NULL).put("validationDetail", it.validationDetail ?: JSONObject.NULL)
+            .put("error", it.error ?: "") }))
         .put("results", JSONArray(results.map { r ->
             JSONObject()
                 .put("action", r.action.name)

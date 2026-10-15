@@ -67,7 +67,9 @@ data class DownloadTask(
     var error: String? = null,
     val createdAt: Long = System.currentTimeMillis(),
     val canPause: Boolean = false,
-    val canResume: Boolean = false
+    val canResume: Boolean = false,
+    val elapsedMs: Long? = null,
+    val validationDetail: String? = null
 )
 
 class DownloadQueueManager(
@@ -152,7 +154,8 @@ class DownloadQueueManager(
         if (activeJobs.containsKey(taskId)) return
         updateTask(taskId) {
             if (it.state in setOf(DownloadState.FAILED, DownloadState.CANCELLED))
-                it.copy(state = DownloadState.QUEUED, rawInfo = null, progress = -1f, error = null, outputUri = null, bytes = 0)
+                it.copy(state = DownloadState.QUEUED, rawInfo = null, progress = -1f, error = null, outputUri = null, bytes = 0,
+                    elapsedMs = null, validationDetail = null)
             else it
         }
         processNext()
@@ -229,7 +232,8 @@ class DownloadQueueManager(
                 }
                 downloaded
             }
-            updateTask(task.id) { it.copy(state = DownloadState.COMPLETED, progress = 100f, outputUri = result.outputUri, bytes = result.bytes) }
+            updateTask(task.id) { it.copy(state = DownloadState.COMPLETED, progress = 100f, outputUri = result.outputUri, bytes = result.bytes,
+                elapsedMs = result.elapsedMs, validationDetail = result.detail) }
             PocketNotifier.showSuccess(application, task.id.hashCode(),
                 if (AppSettings.isArabic) "اكتمل التنزيل" else "Download complete", task.title, result.outputUri)
         } catch (failure: Exception) {

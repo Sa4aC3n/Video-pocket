@@ -56,12 +56,16 @@ class PersistenceSafetyTest {
         store.save(listOf(DownloadTask(id = "pending", url = "https://example.org/a", title = "title", platform = "test", quality = "720p", format = "webm",
             isClip = true, clipRequest = clip, state = DownloadState.DOWNLOADING),
             DownloadTask(id = "done", url = "https://example.org/b", title = "done", platform = "test", quality = "", format = "mp4",
-                state = DownloadState.COMPLETED, outputUri = "content://media/7", bytes = 100)))
+                state = DownloadState.COMPLETED, outputUri = "content://media/7", bytes = 100,
+                elapsedMs = 1337, validationDetail = "video/avc; container verified")))
         val loaded = store.load()
         assertEquals(DownloadState.FAILED, loaded[0].state)
         assertEquals("INTERRUPTED", loaded[0].error)
         assertEquals(clip, loaded[0].clipRequest)
         assertEquals(DownloadState.COMPLETED, loaded[1].state)
         assertEquals("content://media/7", loaded[1].outputUri)
+        assertEquals(1337L, loaded[1].elapsedMs)
+        assertEquals("video/avc; container verified", loaded[1].validationDetail)
+        assertNull(loaded[0].elapsedMs)
     }
 }

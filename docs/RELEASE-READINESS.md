@@ -1,7 +1,7 @@
-# Release readiness — 2026-10-14
+# Release readiness — updated 2026-10-15
 
 Candidate: **0.2.0-rc1**, versionCode **2**, applicationId **org.videopocket.probe**.
-The application ID and existing library/settings schema are retained. Existing signing keys have not been changed or generated. Do not uninstall an existing installation to work around a signing mismatch: use its original signing key for an update.
+Compile/target SDK is **36**, meeting the currently documented phone-app target requirement. The application ID and existing library/settings schema are retained. Existing signing keys have not been changed or generated. Do not uninstall an existing installation to work around a signing mismatch: use its original signing key for an update.
 
 ## Gates
 
@@ -9,8 +9,8 @@ The application ID and existing library/settings schema are retained. Existing s
 | --- | --- |
 | Incremental main-only development; no history rewrite | Verified at every implementation milestone |
 | Debug build, unit tests and Android lint | Passed on multiple milestones; exact final evidence is in the implementation report |
-| Unsigned release build and release lint | Added as required CI gates; inspect the final run |
-| Native media processing and UI instrumentation | Required CI emulator tests; inspect the final run |
+| Unsigned release build and release lint | Passed on `ea76a0f` and `bc26467`; exact final run is in the implementation report |
+| Native media processing and UI instrumentation | Four tests passed on API 29 at `bc26467`; API 29/36 and live-download evidence are recorded in the final implementation report |
 | ARM64 physical-device testing, playback listening, thermal/battery profiling | Not available in this environment |
 | 16 KB memory-page compatibility | **Blocked**: ten 4 KB-aligned WebP-related ELF dependencies in the pinned runtime |
 | Production signing | **Not performed**: original signing identity/key is needed |

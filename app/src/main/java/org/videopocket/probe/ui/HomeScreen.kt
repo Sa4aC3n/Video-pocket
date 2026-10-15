@@ -106,8 +106,11 @@ fun HomeScreen(
     }
 
     val triggerDownloadWithDuplicateCheck: (() -> Unit) -> Unit = { action ->
-        val mediaTitle = model.info?.title.orEmpty()
-        val existing = model.libraryItems.firstOrNull { it.title.equals(mediaTitle, ignoreCase = true) }
+        val media = model.info
+        val platform = model.normalizedMetadata?.platform ?: media?.extractor
+        val existing = model.libraryItems.firstOrNull {
+            MediaIdentity.sameSource(it, model.inspectedUrl, media?.id, platform)
+        }
         if (existing != null) {
             duplicateItemToConfirm = existing
             pendingDownloadAction = action

@@ -1,4 +1,4 @@
-# Video Pocket implementation evidence — 2026-10-14
+# Video Pocket implementation evidence — 2026-10-14–15
 
 Baseline: `74538de5770ca7ea5cb4c9e3b8cf29925d502e39`. Work continues exclusively on `main`, using expected-head fast-forwards. No force-push, reset, branch replacement or deletion of prior user work was used. Every milestone's GitHub head and local Git tree were checked after synchronization.
 
@@ -13,6 +13,13 @@ Baseline: `74538de5770ca7ea5cb4c9e3b8cf29925d502e39`. Work continues exclusively
 | `4ed5ef1992dcf35ace98079f40764b07618a301c` | Persistence/corruption recovery unit tests and native media instrumentation |
 | `b508d527cca3ddf46524a65a9dd8d126b7dfbb84` | Unified Home/download queue, remove guessed clip size/resolution/duration, actual runtime-version API, device-transfer rules, emulator disk fix |
 | `99fcd2e5a58c9bbf4399d94d3e68c61641ce6fba` | Resource watchdogs, MIME/rollback fixes, native page-size gate, subtitle conversion and fetch hardening, version 0.2.0-rc1, release/UI/performance gates |
+| `dc553a2b12238e003de1e739655bcc3d656c7737` | Initial shared C++ dependency fix and detailed release/security reports |
+| `ea76a0f91d2cf84aadb852c7084803162410da26` | Shared native dependency extraction; CI verified 68 unit tests and both APK variants/lint |
+| `bc26467cf27f1c6e9149eae39e2ae1e8c3cdb6d4` | Preserve native archive symlinks using upstream extraction; reserve emulator disk; four real device tests passed |
+| `9754b7178451f16e9d49dcf97795951082a8aab1` | Public MDN download/indexing integration test; measured processing JSON |
+| `8b779f25b0d1e7d284cac94b9cea8be463b7f97e` | Real compression maximum-size and impossible-size regressions |
+| `1d96f6b3d61203f41eeceeb1f50526ff5ecc5dd5` | API 36 target, API 29/36 emulator matrix, Android 13+ notification permission controls |
+| `4920f64e9de01d0fef5a580c6e0ebfdcb3a07bd0` | Retain screenshots/JSON before AGP uninstall; reinstall exact APK for valid startup/memory evidence; reject physical devices in destructive test script |
 
 ## Phase 4 — security, downloader, playlists and storage
 
@@ -33,7 +40,7 @@ Baseline: `74538de5770ca7ea5cb4c9e3b8cf29925d502e39`. Work continues exclusively
 - FFmpeg `out_time_us` drives progress; copy/validation/save stages are indeterminate. Completion reaches 100 only after validation/publication. Cancellation terminates the owned Studio process and removes its scratch work.
 - Validate duration and required tracks, reject missing tracks/protected/HDR inputs, retain originals, bound logging/threads/time and watch free space. Output indexing failure rolls back the newly published file.
 - Real SRT/VTT timed-cue conversion preserves Unicode and timing; JSON/HTML/unsupported subtitle input is not renamed to SRT. Subtitle publication uses safe names and pending-row rollback.
-- Device testing exposed missing `libc++_shared.so` when Studio starts independently. The corrective implementation extracts that existing bundled library from the wrapper's Python archive without initializing the network downloader or fetching code. Its rerun is recorded below when available.
+- Device testing exposed missing `libc++_shared.so` when Studio starts independently. The corrective implementation uses the upstream asset extractors, including Python-archive shared libraries and their symlinks. This runs lazily on IO when processing is requested; extraction makes no network requests and does not execute yt-dlp. The native rerun passed.
 
 ## Phases 7–8 — UI, library and queue
 
@@ -53,11 +60,13 @@ Baseline: `74538de5770ca7ea5cb4c9e3b8cf29925d502e39`. Work continues exclusively
 | 38509927868 / `d05604b` | **PASS** test/build/lint workflow |
 | 38510090296 / `4ed5ef1` | Unit/build/lint job **PASS**; emulator failed before tests because requested userdata exceeded free disk |
 | 38540458431 / `b508d52` | Unit/build/test-APK/lint job **PASS**. Emulator booted; **2 tests, 1 pass, 1 failure**. Lazy startup passed. FFmpeg failed to load `libc++_shared.so` before capability discovery. This is an application integration failure, not a passed media test. |
-| 38541882373 / `99fcd2e` | Running at this checkpoint; includes release build/lint and expanded UI/native regressions |
+| 38541882373 / `99fcd2e` | Failed; superseded by shared-runtime and runner-space fixes |
+| 38543007825 / `ea76a0f` | **68 unit tests, 0 failures/errors/skips; debug/test/release APKs passed; debug and release lint: 0 errors, 54 warnings each.** Emulator failed before tests: userdata image still exceeded disk despite the AVD size setting. |
+| 38694680072 / `bc26467` | **PASS** build/unit/debug+release lint and **4 device tests, 0 failures/errors/skips** on API 29 / 4 KB pages. Compression, trim, audio extraction, conditional WebM conversion, cancellation, original hashes, lazy startup, actual downloader execution, RTL/LTR and theme/navigation controls passed. Startup/memory files from this run are invalid because AGP had uninstalled the app; no performance conclusion is drawn from them. |
 
 Local Gradle was attempted but blocked before execution by `UnknownHostException: services.gradle.org`; JDK 17 is present, but no local Android SDK/device is available. Actual builds/tests run in GitHub Actions with full checkouts. `git diff --check` and shell syntax validation passed before each relevant milestone.
 
-Instrumentation uses real generated video/audio, not mocked processing: compression reduction, trim duration, audio extraction, optional available WebM conversion, real progress/cancellation and SHA-256 preservation of originals. Downloader execution is checked offline with `--version`; no all-provider live compatibility claim follows from this check.
+Instrumentation uses real generated video/audio, not mocked processing: compression reduction, trim duration, audio extraction, optional available WebM conversion, real progress/cancellation and SHA-256 preservation of originals. Downloader execution is checked offline with `--version`; a separately enabled public-network test exercises the MDN flower.mp4 fixture, output validation and actual metadata indexing. The live fixture is documented at https://developer.mozilla.org/en-US/docs/Web/HTML/Reference/Elements/video . This does not establish live compatibility with every provider.
 
 Native packaging audit of the verified `980d9b0` APK: **512 ELF files; 10 WebP-related dependencies have 4 KB alignment**. See the [release audit](RELEASE-READINESS.md). Lint has warnings (dependency/SDK updates, legacy icon/resources and style); it is not warning-free. Fixed-rate native scheduling and missing extraction-rule warnings were addressed.
 
@@ -65,7 +74,13 @@ Startup timings, memory and UI screenshots are collected by `scripts/verify-devi
 
 ## Phase 10 — release audit and limits
 
-Version is **0.2.0-rc1 / 2**; application ID and user-data schema are unchanged. CI now requires debug/test/release APK compilation, unit tests, debug/release lint and connected emulator tests. The release APK is unsigned. README now distinguishes real behavior, conditional support and open limits. See [source security review](SECURITY-REVIEW-2026-10-14.md).
+Version is **0.2.0-rc1 / 2**, with compile/target API **36**; application ID and user-data schema are unchanged. The Android 16 behavior review covers enforced edge-to-edge, current back APIs, adaptive sizing and scheduling. Existing Compose insets and responsive layouts are retained. The toolchain already meets the documented API 36 minimum (AGP 8.9.1; project uses 8.9.2), so no major build-system migration was needed. CI now requires debug/test/release APK compilation, unit tests, debug/release lint and connected emulator tests. The release APK is unsigned. README now distinguishes real behavior, conditional support and open limits. See [source security review](SECURITY-REVIEW-2026-10-14.md).
+
+Current platform references checked 2026-10-15:
+
+- https://developer.android.com/google/play/requirements/target-sdk — API 36 required for new phone-app submissions/updates from August 31, 2026.
+- https://developer.android.com/build/releases/about-agp — minimum AGP 8.9.1 for API 36.
+- https://developer.android.com/about/versions/16/behavior-changes-16 — target API 36 behavior review.
 
 Open release gates:
 

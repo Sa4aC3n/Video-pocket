@@ -45,9 +45,8 @@ class UiRegressionTest {
     }
 
     private fun saveScreenshot(name: String) {
-        val folder = File(compose.activity.getExternalFilesDir(null), "verification").apply { mkdirs() }
         val prefix = if (isTabletRun()) "tablet-" else ""
-        File(folder, prefix + name).outputStream().use {
+        TestEvidence.output(compose.activity, prefix + name).use {
             compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
         }
     }

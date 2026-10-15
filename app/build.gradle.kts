@@ -14,7 +14,7 @@ android {
         versionName = "0.2.0-rc1"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        testInstrumentationRunnerArguments["additionalTestOutputDir"] = "/sdcard/Android/data/org.videopocket.probe/files/verification"
+        testInstrumentationRunnerArguments["useTestStorageService"] = "true"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -52,6 +52,7 @@ dependencies {
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test:runner:1.6.2")
     androidTestImplementation("androidx.test:core:1.6.1")
+    androidTestUtil("androidx.test.services:test-services:1.5.0")
     androidTestImplementation(platform("androidx.compose:compose-bom:2025.04.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 }

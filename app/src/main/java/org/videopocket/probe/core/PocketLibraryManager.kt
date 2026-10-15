@@ -51,7 +51,8 @@ object PocketLibraryManager {
                         isFavorite = obj.optBoolean("isFavorite", false),
                         collections = colList,
                         sourceMediaId = obj.optString("sourceMediaId").takeIf { it.isNotBlank() },
-                        sourceUrl = obj.optString("sourceUrl").takeIf { it.isNotBlank() }
+                        sourceUrl = obj.optString("sourceUrl").takeIf { it.isNotBlank() },
+                        mimeType = obj.optString("mimeType").takeIf { it.isNotBlank() && it != "null" }
                     )
                 )
             }
@@ -87,6 +88,7 @@ object PocketLibraryManager {
                     put("collections", cols)
                     put("sourceMediaId", item.sourceMediaId ?: "")
                     put("sourceUrl", item.sourceUrl ?: "")
+                    put("mimeType", item.mimeType ?: "")
                 }
                 array.put(obj)
             }
@@ -152,7 +154,7 @@ object PocketLibraryManager {
 
     fun playItem(context: Context, item: PocketLibraryItem) {
         try {
-            val mime = context.contentResolver.getType(Uri.parse(item.uriString)) ?: MediaTypes.fallbackMime(item.format)
+            val mime = item.mimeType ?: context.contentResolver.getType(Uri.parse(item.uriString)) ?: MediaTypes.fallbackMime(item.format)
             val intent = Intent(Intent.ACTION_VIEW).apply {
                 setDataAndType(Uri.parse(item.uriString), mime)
                 addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -164,7 +166,7 @@ object PocketLibraryManager {
     fun shareItem(context: Context, item: PocketLibraryItem) {
         try {
             val uri = Uri.parse(item.uriString)
-            val mime = context.contentResolver.getType(uri) ?: MediaTypes.fallbackMime(item.format)
+            val mime = item.mimeType ?: context.contentResolver.getType(uri) ?: MediaTypes.fallbackMime(item.format)
             val shareIntent = Intent(Intent.ACTION_SEND).apply {
                 type = mime
                 putExtra(Intent.EXTRA_STREAM, uri)

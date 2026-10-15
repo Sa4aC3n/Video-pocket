@@ -134,7 +134,8 @@ data class PocketLibraryItem(
     val isFavorite: Boolean = false,
     val collections: List<String> = emptyList(),
     val sourceMediaId: String? = null,
-    val sourceUrl: String? = null
+    val sourceUrl: String? = null,
+    val mimeType: String? = null
 )
 
 object LinkPolicy {

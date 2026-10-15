@@ -220,7 +220,7 @@ class LocalMediaProcessor(private val context: Context) {
                     clipRange = if (request.mode == ProcessingMode.TRIM) "${ClipRequest.formatSeconds(request.startSeconds)} → ${ClipRequest.formatSeconds(request.endSeconds!!)}" else null,
                     duration = media.durationMs?.let { ClipRequest.formatSeconds(it / 1000.0) } ?: "—",
                     resolution = media.height?.let { "${it}p" } ?: if (audioOnly) "Audio" else "—",
-                    format = media.extension, fileSizeBytes = media.bytes, platform = "Local"
+                    format = media.extension, fileSizeBytes = media.bytes, platform = "Local", mimeType = media.mime
                 ))
                 onProgress(ProcessingUpdate(100f, "COMPLETE"))
                 return ProcessingResult(media, input.length(), encoder)

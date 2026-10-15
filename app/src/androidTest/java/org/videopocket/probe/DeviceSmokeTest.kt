@@ -79,6 +79,15 @@ class DeviceSmokeTest {
             val audio = LocalMediaProcessor(context).run(ProcessingRequest(original, "instrumented-audio", ProcessingMode.EXTRACT_AUDIO, format = "m4a")) {}
             uris.add(audio.media.uri)
             assertTrue(audio.media.isAudio)
+            assertEquals("M4A", audio.media.extension)
+            assertEquals("audio/mp4", audio.media.mime)
+            val audioTracks = android.media.MediaExtractor()
+            try {
+                audioTracks.setDataSource(context, Uri.parse(audio.media.uri), null)
+                assertTrue((0 until audioTracks.trackCount).any {
+                    audioTracks.getTrackFormat(it).getString(android.media.MediaFormat.KEY_MIME) == "audio/mp4a-latm"
+                })
+            } finally { audioTracks.release() }
             assertEquals(before, hash(original))
             if ("webm" in capabilities.formats(false)) {
                 val converted = LocalMediaProcessor(context).run(ProcessingRequest(original, "instrumented-conversion", ProcessingMode.CONVERT, format = "webm")) {}
@@ -161,8 +170,7 @@ class DeviceSmokeTest {
     }
 
     private fun evidence(name: String, value: org.json.JSONObject) {
-        val folder = File(context.getExternalFilesDir(null), "verification").apply { mkdirs() }
-        File(folder, name).writeText(value.toString(2))
+        TestEvidence.output(context, name).bufferedWriter().use { it.write(value.toString(2)) }
     }
     private fun hash(uri: String): String {
         val digest = MessageDigest.getInstance("SHA-256")

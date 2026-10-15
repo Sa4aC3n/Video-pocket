@@ -35,9 +35,13 @@ data class SavedMedia(
             var duration: Long? = null
             var width: Int? = null
             var height: Int? = null
+            var contentMime: String? = null
             val reader = MediaMetadataRetriever()
             try {
                 reader.setDataSource(context, uri)
+                contentMime = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_MIMETYPE)?.takeIf { it.isNotBlank() }
+                if (contentMime == "video/mp4" && reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_AUDIO) == "yes" &&
+                    reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_HAS_VIDEO) != "yes") contentMime = "audio/mp4"
                 duration = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.takeIf { it > 0 }
                 width = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()?.takeIf { it > 0 }
                 height = reader.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull()?.takeIf { it > 0 }
@@ -47,7 +51,7 @@ data class SavedMedia(
             } catch (_: Exception) {
                 // Some containers are playable externally but not readable by the platform retriever.
             } finally { reader.release() }
-            return SavedMedia(uriString, name, bytes, duration, width, height, resolver.getType(uri))
+            return SavedMedia(uriString, name, bytes, duration, width, height, contentMime ?: resolver.getType(uri))
         }
     }
 }
@@ -69,7 +73,7 @@ object LibraryIndexer {
                 format = media.extension, fileSizeBytes = media.bytes,
                 thumbnailUri = if (source.isPlaylist) null else source.thumbnailUrl,
                 platform = platform, sourceMediaId = if (source.isPlaylist) null else source.id,
-                sourceUrl = sourceUrl
+                sourceUrl = sourceUrl, mimeType = media.mime
             )
         }
         PocketLibraryManager.addItems(context, items)

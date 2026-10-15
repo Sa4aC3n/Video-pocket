@@ -167,7 +167,7 @@ object FormatPolicy {
             if (!id.matches(Regex("[A-Za-z0-9_.-]+"))) throw ProbeFailure(Problem.UNSUPPORTED)
             return id
         }
-        val audio = info.formats.filter { it.audio && !it.video }.maxByOrNull { it.bytes ?: 0 }
+        val audio = info.formats.filter { it.audio && !it.video && it.videoKnown }.maxByOrNull { it.bytes ?: 0 }
         val videos = info.formats.filter { (it.video || !it.videoKnown) && it.height == height }
         return when (action) {
             ProbeAction.INSPECT -> "best"

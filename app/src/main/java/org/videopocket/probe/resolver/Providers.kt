@@ -103,7 +103,7 @@ abstract class BaseMediaProvider : MediaProvider {
             u.contains("/reel") -> MediaType.REEL
             u.contains("/stories/") || u.contains("/story/") -> MediaType.STORY
             u.contains("/shorts/") || u.contains("tiktok.com") -> MediaType.SHORT_VIDEO
-            info.formats.all { it.audio && !it.video } -> MediaType.AUDIO
+            info.formats.all { it.audio && !it.video && it.videoKnown } -> MediaType.AUDIO
             else -> MediaType.VIDEO
         }
     }
@@ -149,7 +149,7 @@ abstract class BaseMediaProvider : MediaProvider {
                             format = chosen.extension.ifBlank { "mp4" },
                             fileSize = chosen.bytes,
                             videoUrl = chosen.url,
-                            requiresMerge = chosen.video && !chosen.audio,
+                            requiresMerge = chosen.video && !chosen.audio && chosen.audioKnown,
                             isAudioOnly = false
                         )
                     )
@@ -164,7 +164,7 @@ abstract class BaseMediaProvider : MediaProvider {
             }
 
             // 2. Map audio formats truthfully
-            val audioFormats = info.formats.filter { it.audio && !it.video }
+            val audioFormats = info.formats.filter { it.audio && !it.video && it.videoKnown }
             if (audioFormats.isNotEmpty()) {
                 val bestAudio = audioFormats.maxByOrNull { it.bytes ?: 0 }
                 val realFmt = bestAudio?.extension?.ifBlank { "m4a" } ?: "m4a"

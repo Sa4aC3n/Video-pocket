@@ -19,6 +19,10 @@ class Phase4SafetyTest {
         assertThrows(ProbeFailure::class.java) { FormatPolicy.select(audio, ProbeAction.VIDEO, 0) }
         val video = MediaInfo("Video", null, listOf(MediaFormat("v", "mp4", 720, true, false, null)))
         assertThrows(ProbeFailure::class.java) { FormatPolicy.select(video, ProbeAction.MP3, 720) }
+        val uncertainAudio = MediaFormat("ambiguous", "mp4", 0, false, true, null, videoKnown = false)
+        assertThrows(ProbeFailure::class.java) {
+            FormatPolicy.select(video.copy(formats = video.formats + uncertainAudio), ProbeAction.MERGE, 720)
+        }
     }
 
     @Test fun privateAndAmbiguousIpLiteralsCannotBePublicSources() {

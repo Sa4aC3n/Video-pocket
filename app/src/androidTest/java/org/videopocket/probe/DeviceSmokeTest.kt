@@ -42,8 +42,8 @@ class DeviceSmokeTest {
             BundledFfmpeg.initialize(context)
             val file = File(folder, "source.mp4")
             val binary = File(context.applicationInfo.nativeLibraryDir, "libffmpeg.so")
-            val builder = ProcessBuilder(binary.path, "-hide_banner", "-nostdin", "-y", "-f", "lavfi", "-i", "testsrc2=size=320x240:rate=15",
-                "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=44100", "-t", "4", "-c:v", "libx264", "-crf", "12", "-threads", "2", "-c:a", "aac", file.path)
+            val builder = ProcessBuilder(binary.path, "-hide_banner", "-nostdin", "-y", "-f", "lavfi", "-i", "testsrc2=size=640x480:rate=15",
+                "-f", "lavfi", "-i", "sine=frequency=1000:sample_rate=44100", "-t", "6", "-c:v", "libx264", "-crf", "12", "-threads", "2", "-c:a", "aac", file.path)
                 .redirectErrorStream(true).redirectOutput(File(folder, "fixture.log"))
             builder.environment()["LD_LIBRARY_PATH"] = BundledFfmpeg.libraryPath(context)
             val child = builder.start()
@@ -64,6 +64,14 @@ class DeviceSmokeTest {
             assertTrue(progress.isNotEmpty())
             assertEquals(100f, progress.last(), 0f)
             assertTrue(progress.dropLast(1).all { it in 0f..99f })
+            val sizeLimit = (result.inputBytes * 0.6).toLong()
+            val capped = LocalMediaProcessor(context).run(ProcessingRequest(original, "instrumented-size-limit", targetBytes = sizeLimit)) {}
+            uris.add(capped.media.uri)
+            assertTrue("Actual capped output must satisfy the requested maximum", capped.media.bytes in 1..sizeLimit)
+            val impossible = LocalMediaProcessor(context)
+            try { impossible.run(ProcessingRequest(original, "impossible-size", targetBytes = 1024)) {}; fail("Impossible size must fail") }
+            catch (failure: ProcessingFailure) { assertEquals("TARGET_TOO_SMALL", failure.code) }
+            assertEquals(before, hash(original))
             val trim = LocalMediaProcessor(context).run(ProcessingRequest(original, "instrumented-trim", ProcessingMode.TRIM,
                 startSeconds = 1.0, endSeconds = 2.5)) {}
             uris.add(trim.media.uri)
@@ -98,6 +106,7 @@ class DeviceSmokeTest {
             evidence("processing.json", org.json.JSONObject()
                 .put("inputBytes", result.inputBytes).put("compressedBytes", result.media.bytes)
                 .put("compressionElapsedMs", compressionMs).put("encoder", result.encoder)
+                .put("requestedLimitBytes", sizeLimit).put("cappedOutputBytes", capped.media.bytes)
                 .put("trimDurationMs", trim.media.durationMs).put("extractedAudioMime", audio.media.mime)
                 .put("originalHashPreserved", before == hash(original))
                 .put("cancelledDuringNativeProgress", cancelledActiveProcess)

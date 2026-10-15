@@ -16,7 +16,8 @@ adb logcat -d -v threadtime > "$evidence/logcat.txt"
 # Reinstall the exact verified debug APK for a separate cold-launch sample.
 profiling_status=0
 if adb install -r -t app/build/outputs/apk/debug/app-debug.apk; then
-  adb shell am start -S -W --activity-clear-task --activity-new-task -n org.videopocket.probe/.MainActivity > "$evidence/cold-start.txt"
+  # NEW_TASK | CLEAR_TASK; am has no --activity-new-task option.
+  adb shell am start -S -W -f 0x10008000 -n org.videopocket.probe/.MainActivity > "$evidence/cold-start.txt" 2>&1
   rg -q '^Status: ok' "$evidence/cold-start.txt" || profiling_status=1
   adb shell dumpsys meminfo org.videopocket.probe > "$evidence/memory.txt"
   if rg -q 'No process found' "$evidence/memory.txt"; then profiling_status=1; fi

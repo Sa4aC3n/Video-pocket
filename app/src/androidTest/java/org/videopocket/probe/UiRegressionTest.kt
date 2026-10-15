@@ -23,9 +23,7 @@ class UiRegressionTest {
         try {
             compose.runOnUiThread { AppSettings.setLanguage(false); AppSettings.setTheme(ThemeMode.LIGHT) }
             compose.onNodeWithText("Paste video link").assertIsDisplayed()
-            val homeLeft = compose.onNodeWithText("Home").fetchSemanticsNode().boundsInRoot.left
-            val settingsLeft = compose.onNodeWithText("Settings").fetchSemanticsNode().boundsInRoot.left
-            assertTrue("English navigation must be LTR", homeLeft < settingsLeft)
+            assertNavigationDirection(arabic = false)
             saveScreenshot("english-light.png")
             compose.onNodeWithText("Pocket").performClick()
             compose.onNodeWithText("Search title, format or collection").assertIsDisplayed()
@@ -39,9 +37,7 @@ class UiRegressionTest {
             assertEquals(ThemeMode.SYSTEM, AppSettings.themeMode)
             compose.onNodeWithText("الرئيسية").performClick()
             compose.onNodeWithText("الصق رابط الفيديو").assertIsDisplayed()
-            val homeRight = compose.onNodeWithText("الرئيسية").fetchSemanticsNode().boundsInRoot.right
-            val settingsRight = compose.onNodeWithText("الإعدادات").fetchSemanticsNode().boundsInRoot.right
-            assertTrue("Arabic navigation must be RTL", homeRight > settingsRight)
+            assertNavigationDirection(arabic = true)
             saveScreenshot("arabic-system.png")
         } finally {
             compose.runOnUiThread { AppSettings.setLanguage(oldArabic); AppSettings.setTheme(oldTheme) }
@@ -50,8 +46,25 @@ class UiRegressionTest {
 
     private fun saveScreenshot(name: String) {
         val folder = File(compose.activity.getExternalFilesDir(null), "verification").apply { mkdirs() }
-        File(folder, name).outputStream().use {
+        val prefix = if (isTabletRun()) "tablet-" else ""
+        File(folder, prefix + name).outputStream().use {
             compose.onRoot().captureToImage().asAndroidBitmap().compress(Bitmap.CompressFormat.PNG, 100, it)
+        }
+    }
+
+    private fun isTabletRun() = androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("tabletUi") == "true"
+
+    private fun assertNavigationDirection(arabic: Boolean) {
+        val home = compose.onNodeWithText(if (arabic) "الرئيسية" else "Home").fetchSemanticsNode().boundsInRoot
+        val settings = compose.onNodeWithText(if (arabic) "الإعدادات" else "Settings").fetchSemanticsNode().boundsInRoot
+        val vertical = kotlin.math.abs(home.center.x - settings.center.x) < 2f
+        assertEquals("Navigation must adapt to the tested window width", isTabletRun(), vertical)
+        if (vertical) {
+            assertTrue(home.top < settings.top)
+            val middle = compose.onRoot().fetchSemanticsNode().boundsInRoot.center.x
+            assertTrue("Rail must follow interface direction", if (arabic) home.center.x > middle else home.center.x < middle)
+        } else {
+            assertTrue("Navigation must follow interface direction", if (arabic) home.right > settings.right else home.left < settings.left)
         }
     }
 }

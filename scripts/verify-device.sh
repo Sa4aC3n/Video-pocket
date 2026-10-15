@@ -22,6 +22,20 @@ if adb install -r -t app/build/outputs/apk/debug/app-debug.apk; then
   adb shell dumpsys meminfo org.videopocket.probe > "$evidence/memory.txt"
   if rg -q 'No process found' "$evidence/memory.txt"; then profiling_status=1; fi
   adb exec-out screencap -p > "$evidence/launch.png"
+  # Exercise the actual wide-window rail and larger text on this disposable emulator.
+  trap 'adb shell wm size reset; adb shell wm density reset; adb shell settings put system font_scale 1.0' EXIT
+  adb shell wm size 1920x1200
+  adb shell wm density 160
+  adb shell settings put system font_scale 1.5
+  if adb install -r -t app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk; then
+    adb shell am instrument -w -r -e class org.videopocket.probe.UiRegressionTest -e tabletUi true \
+      org.videopocket.probe.test/androidx.test.runner.AndroidJUnitRunner > "$evidence/tablet-ui.txt"
+    rg -q 'OK \(1 test\)' "$evidence/tablet-ui.txt" || profiling_status=1
+    mkdir -p "$evidence/tablet"
+    adb pull /sdcard/Android/data/org.videopocket.probe/files/verification/. "$evidence/tablet/" || profiling_status=1
+  else
+    profiling_status=1
+  fi
 else
   profiling_status=1
 fi

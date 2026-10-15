@@ -215,12 +215,16 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         val array = json.optJSONArray("formats")
         val rows = if (array == null) listOf(json) else (0 until array.length()).map { array.getJSONObject(it) }
         val formats = rows.filter { !it.optBoolean("has_drm") }.map { f ->
-            fun codec(key: String): Boolean = f.optString(key).let { it.isNotBlank() && it != "none" && it != "null" }
+            fun codec(key: String): String? = f.optString(key).takeIf { it.isNotBlank() && it != "null" }
+            val videoCodec = codec("vcodec")
+            val audioCodec = codec("acodec")
+            val reportedHeight = f.optInt("height", 0).coerceAtLeast(0)
             org.videopocket.probe.core.MediaFormat(
-                f.optString("format_id", "best"), f.optString("ext"), f.optInt("height", 0),
-                if (!f.has("vcodec")) f.optString("ext") !in setOf("mp3", "m4a", "aac", "ogg", "opus") else codec("vcodec"), if (!f.has("acodec")) true else codec("acodec"),
+                f.optString("format_id", "best").ifBlank { "best" }, f.optString("ext"), reportedHeight,
+                reportedHeight > 0 || videoCodec != null && videoCodec != "none", audioCodec != null && audioCodec != "none",
                 f.optLong("filesize", f.optLong("filesize_approx", 0)).takeIf { it > 0 },
-                f.optString("url").takeIf { it.isNotBlank() }
+                f.optString("url").takeIf { it.isNotBlank() },
+                videoKnown = reportedHeight > 0 || videoCodec != null, audioKnown = audioCodec != null
             )
         }
         if (formats.isEmpty()) throw ProbeFailure(Problem.UNSUPPORTED)

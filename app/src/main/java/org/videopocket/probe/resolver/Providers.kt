@@ -156,6 +156,13 @@ abstract class BaseMediaProvider : MediaProvider {
                 }
             }
 
+            if (heights.isEmpty()) {
+                info.formats.firstOrNull { it.height == 0 && (it.video || !it.videoKnown) }?.let { source ->
+                    variants.add(MediaVariant(id = source.id, quality = "Source media (quality unknown)",
+                        height = 0, format = source.extension, fileSize = source.bytes, videoUrl = source.url))
+                }
+            }
+
             // 2. Map audio formats truthfully
             val audioFormats = info.formats.filter { it.audio && !it.video }
             if (audioFormats.isNotEmpty()) {

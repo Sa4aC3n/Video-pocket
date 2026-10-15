@@ -12,7 +12,9 @@ data class MediaFormat(
     val video: Boolean,
     val audio: Boolean,
     val bytes: Long?,
-    val url: String? = null
+    val url: String? = null,
+    val videoKnown: Boolean = true,
+    val audioKnown: Boolean = true
 )
 data class PlaylistEntry(val id: String, val title: String, val duration: Double? = null, val url: String? = null)
 data class SubtitleTrack(
@@ -166,13 +168,13 @@ object FormatPolicy {
             return id
         }
         val audio = info.formats.filter { it.audio && !it.video }.maxByOrNull { it.bytes ?: 0 }
-        val videos = info.formats.filter { it.video && it.height == height }
+        val videos = info.formats.filter { (it.video || !it.videoKnown) && it.height == height }
         return when (action) {
             ProbeAction.INSPECT -> "best"
-            ProbeAction.MP3 -> safe((audio ?: info.formats.lastOrNull { it.audio }
+            ProbeAction.MP3 -> safe((audio ?: info.formats.lastOrNull { it.audio || !it.audioKnown }
                 ?: throw ProbeFailure(Problem.UNSUPPORTED)).id)
             ProbeAction.MERGE -> {
-                val video = videos.lastOrNull { !it.audio } ?: throw ProbeFailure(Problem.UNSUPPORTED)
+                val video = videos.lastOrNull { !it.audio && it.audioKnown } ?: throw ProbeFailure(Problem.UNSUPPORTED)
                 safe(video.id) + "+" + safe((audio ?: throw ProbeFailure(Problem.UNSUPPORTED)).id)
             }
             ProbeAction.VIDEO -> {

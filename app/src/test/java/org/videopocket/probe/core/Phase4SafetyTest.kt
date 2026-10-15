@@ -4,6 +4,23 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class Phase4SafetyTest {
+    @Test fun unknownDirectTracksRemainDownloadableWithoutInventingResolution() {
+        val source = MediaFormat("mp4", "mp4", 0, false, false, null, videoKnown = false, audioKnown = false)
+        val info = MediaInfo("Direct source", null, listOf(source))
+        assertTrue(info.heights.isEmpty())
+        assertEquals(0, info.defaultHeight)
+        assertEquals("mp4", FormatPolicy.select(info, ProbeAction.VIDEO, 0))
+        assertEquals("mp4", FormatPolicy.select(info, ProbeAction.MP3, 0))
+        assertThrows(ProbeFailure::class.java) { FormatPolicy.select(info, ProbeAction.VIDEO, 1080) }
+        assertThrows(ProbeFailure::class.java) { FormatPolicy.select(info.copy(formats = listOf(source.copy(id = "best/evil"))), ProbeAction.VIDEO, 0) }
+    }
+    @Test fun knownAbsentTracksAreNotTreatedAsUnknown() {
+        val audio = MediaInfo("Audio", null, listOf(MediaFormat("a", "m4a", 0, false, true, null)))
+        assertThrows(ProbeFailure::class.java) { FormatPolicy.select(audio, ProbeAction.VIDEO, 0) }
+        val video = MediaInfo("Video", null, listOf(MediaFormat("v", "mp4", 720, true, false, null)))
+        assertThrows(ProbeFailure::class.java) { FormatPolicy.select(video, ProbeAction.MP3, 720) }
+    }
+
     @Test fun privateAndAmbiguousIpLiteralsCannotBePublicSources() {
         listOf("http://127.0.0.1/a", "http://2130706433/a", "http://0177.0.0.1/a", "http://10.0.0.1/a",
             "http://192.168.1.1/a", "http://[::ffff:127.0.0.1]/a", "http://[fd00::1]/a").forEach {

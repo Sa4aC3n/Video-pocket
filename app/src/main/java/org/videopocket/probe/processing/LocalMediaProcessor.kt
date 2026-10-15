@@ -20,7 +20,7 @@ class ProcessingFailure(val code: String) : Exception(code)
 data class ProcessingUpdate(val percent: Float?, val stage: String)
 data class ProcessingResult(val media: SavedMedia, val inputBytes: Long, val encoder: String)
 
-/** Blocking, local-only engine. Call on IO; never initializes the network downloader. */
+/** Blocking, local-only engine. Call on IO; bundled runtime extraction makes no network requests. */
 class LocalMediaProcessor(private val context: Context) {
     private val cancelled = AtomicBoolean(false)
     private val lock = Any()

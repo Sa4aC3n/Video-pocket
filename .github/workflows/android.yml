@@ -46,6 +46,13 @@ jobs:
       - name: Enable emulator acceleration
         run: |
           sudo chmod 666 /dev/kvm
+      - name: Reserve space for the emulator userdata image
+        run: |
+          # This disposable runner does not use .NET, Haskell, or native compilation.
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android/sdk/ndk
+          df -h /
+          available_kib=$(df -Pk / | awk 'NR==2 {print $4}')
+          test "$available_kib" -ge 12582912
       - uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 29
@@ -53,6 +60,7 @@ jobs:
           disk-size: 2048M
           ram-size: 2048M
           emulator-boot-timeout: 300
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim -partition-size 2048
           disable-animations: true
           script: bash scripts/verify-device.sh
       - uses: actions/upload-artifact@v4

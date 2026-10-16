@@ -157,10 +157,16 @@ class LocalMediaProcessor(private val context: Context) {
             if (audioOnly && !source.audio || !audioOnly && !source.video) throw ProcessingFailure("MISSING_TRACK")
             val format = if (request.mode == ProcessingMode.COMPRESS) "mp4" else request.format.lowercase(Locale.ROOT)
             if (format !in capabilities.formats(audioOnly)) throw ProcessingFailure("FORMAT_UNAVAILABLE")
-            val encoder = if (audioOnly) capabilities.audioEncoder(format)!! else capabilities.videoEncoder(format, request.preset)!!
+            // Resolve SMART preset to a concrete preset based on source analysis
+            val resolvedPreset = if (request.preset == CompressionPreset.SMART && request.mode == ProcessingMode.COMPRESS) {
+                CompressionPlanner.resolve(context, request.uri, CompressionPreset.SMART)
+            } else {
+                request.preset
+            }
+            val encoder = if (audioOnly) capabilities.audioEncoder(format)!! else capabilities.videoEncoder(format, resolvedPreset)!!
             val output = File(folder, "output.$format")
             val videoSize = if (source.video) ProcessingPolicy.dimensions(source.width, source.height,
-                if (request.mode == ProcessingMode.COMPRESS) request.preset.maxEdge else maxOf(source.width, source.height)) else 0 to 0
+                if (request.mode == ProcessingMode.COMPRESS) resolvedPreset.maxEdge else maxOf(source.width, source.height)) else 0 to 0
             var targetBitrate = request.targetBytes?.let {
                 try { ProcessingPolicy.videoBitrate(it, seconds, source.audio) }
                 catch (_: IllegalArgumentException) { throw ProcessingFailure("TARGET_TOO_SMALL") }
@@ -236,3 +242,4 @@ class LocalMediaProcessor(private val context: Context) {
         private val WATCHDOG = Executors.newSingleThreadScheduledExecutor { runnable -> Thread(runnable, "media-watchdog").apply { isDaemon = true } }
     }
 }
+

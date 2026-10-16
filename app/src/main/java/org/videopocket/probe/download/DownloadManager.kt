@@ -168,6 +168,7 @@ class DownloadQueueManager(
     fun close() {
         closed = true
         engines.values.forEach { it.cancelCurrent() }
+        ServiceController.forceStop(application)
         persist()
         saves.close()
         scope.cancel()
@@ -180,6 +181,11 @@ class DownloadQueueManager(
     }
     private fun processNext() {
         if (closed || recovering) return
+        // Start foreground service when there are active tasks
+        val hasActive = activeJobs.isNotEmpty() || tasks.any { it.state == DownloadState.QUEUED }
+        if (hasActive && !DownloadForegroundService.active) {
+            ServiceController.acquire(application)
+        }
         while (activeJobs.size < maxConcurrent) {
             val next = tasks.asReversed().firstOrNull { it.state == DownloadState.QUEUED } ?: break
             val engine = ProbeEngine(application)
@@ -244,6 +250,10 @@ class DownloadQueueManager(
         } finally {
             engines.remove(task.id)
             activeJobs.remove(task.id)
+            // Stop the foreground service when there are no more active tasks
+            if (activeJobs.isEmpty() && tasks.none { it.state == DownloadState.QUEUED }) {
+                ServiceController.release(application)
+            }
             processNext()
         }
     }

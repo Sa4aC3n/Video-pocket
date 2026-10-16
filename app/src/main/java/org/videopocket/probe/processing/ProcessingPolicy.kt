@@ -3,9 +3,24 @@ package org.videopocket.probe.processing
 import kotlin.math.floor
 
 enum class ProcessingMode { COMPRESS, TRIM, EXTRACT_AUDIO, CONVERT }
+
+/**
+ * Compression presets.
+ *
+ * - HIGH_QUALITY : 1080p max, CRF 20 — best visual quality
+ * - BALANCED     : 720p max,  CRF 26 — good quality / size trade-off (default)
+ * - SMALL_FILE   : 540p max,  CRF 30 — smallest file, lower quality
+ * - SMART        : analysed at runtime by [CompressionPlanner]; picks the best settings
+ *                  based on the source codec, bitrate, and resolution. Falls back to BALANCED.
+ */
 enum class CompressionPreset(val maxEdge: Int, val crf: Int) {
-    HIGH_QUALITY(1920, 20), BALANCED(1280, 26), SMALL_FILE(960, 30)
+    HIGH_QUALITY(1920, 20),
+    BALANCED(1280, 26),
+    SMALL_FILE(960, 30),
+    /** Placeholder — resolved to one of the above by [CompressionPlanner.resolve]. */
+    SMART(1280, 26)
 }
+
 data class ProcessingRequest(
     val uri: String,
     val title: String,
@@ -16,6 +31,7 @@ data class ProcessingRequest(
     val endSeconds: Double? = null,
     val targetBytes: Long? = null
 )
+
 data class ProcessingCapabilities(val encoders: Set<String>, val muxers: Set<String>) {
     fun videoEncoder(format: String, preset: CompressionPreset): String? = when (format) {
         "webm" -> "libvpx-vp9".takeIf { it in encoders }
@@ -26,11 +42,21 @@ data class ProcessingCapabilities(val encoders: Set<String>, val muxers: Set<Str
         else -> null
     }
     fun audioEncoder(format: String): String? = when (format) {
-        "mp3" -> "libmp3lame"; "m4a", "mp4", "mkv" -> "aac"; "webm" -> "libopus"; "wav" -> "pcm_s16le"; else -> null
+        "mp3"              -> "libmp3lame"
+        "m4a", "mp4", "mkv" -> "aac"
+        "webm", "opus"     -> "libopus"
+        "wav"              -> "pcm_s16le"
+        else               -> null
     }?.takeIf { it in encoders }
-    fun muxer(format: String) = when (format) { "mkv" -> "matroska"; "m4a" -> "ipod"; else -> format }
-    fun formats(audioOnly: Boolean): List<String> = (if (audioOnly) listOf("mp3", "m4a", "wav") else listOf("mp4", "webm", "mkv"))
-        .filter { muxer(it) in muxers && audioEncoder(it) != null && (audioOnly || videoEncoder(it, CompressionPreset.BALANCED) != null) }
+    fun muxer(format: String) = when (format) {
+        "mkv"  -> "matroska"
+        "m4a"  -> "ipod"
+        "opus" -> "ogg"
+        else   -> format
+    }
+    fun formats(audioOnly: Boolean): List<String> =
+        (if (audioOnly) listOf("mp3", "m4a", "opus", "wav") else listOf("mp4", "webm", "mkv"))
+            .filter { muxer(it) in muxers && audioEncoder(it) != null && (audioOnly || videoEncoder(it, CompressionPreset.BALANCED) != null) }
 }
 
 object ProcessingPolicy {

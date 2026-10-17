@@ -7,6 +7,7 @@ plugins {
 android {
     namespace = "org.videopocket.probe"
     compileSdk = 36
+    buildToolsVersion = "36.0.0"
 
     defaultConfig {
         applicationId = "org.videopocket.probe"
@@ -24,13 +25,10 @@ android {
         debug {
             isMinifyEnabled = false
             isShrinkResources = false
-            applicationIdSuffix = ".debug"
-            versionNameSuffix = "-debug"
         }
         release {
-            // ── R8 Full Mode / Shrinking / DEX Optimisation ───────────────────
-            isMinifyEnabled = true
-            isShrinkResources = true
+            isMinifyEnabled = false
+            isShrinkResources = false
             signingConfig = signingConfigs.getByName("debug")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),

@@ -3,19 +3,67 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
 }
+
 android {
     namespace = "org.videopocket.probe"
     compileSdk = 36
+
     defaultConfig {
         applicationId = "org.videopocket.probe"
         minSdk = 29
         targetSdk = 36
-        versionCode = 2
-        versionName = "0.2.0-rc1"
+        versionCode = 3
+        versionName = "0.3.0"
         ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["useTestStorageService"] = "true"
     }
+
+    // ─── Build Flavors ──────────────────────────────────────────────────────
+    // standard: Google Play compatible (no BitTorrent, no restricted features)
+    // full    : All features including BitTorrent (sideload / F-Droid only)
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("standard") {
+            dimension = "distribution"
+            applicationIdSuffix = ""
+            versionNameSuffix = ""
+            buildConfigField("boolean", "ENABLE_TORRENT", "false")
+            buildConfigField("String", "FLAVOR_NAME", "\"standard\"")
+        }
+        create("full") {
+            dimension = "distribution"
+            applicationIdSuffix = ".full"
+            versionNameSuffix = "-full"
+            buildConfigField("boolean", "ENABLE_TORRENT", "true")
+            buildConfigField("String", "FLAVOR_NAME", "\"full\"")
+        }
+    }
+
+    // ─── Build Types ─────────────────────────────────────────────────────────
+    buildTypes {
+        debug {
+            // Debug: no shrinking, faster builds
+            isMinifyEnabled = false
+            isShrinkResources = false
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+        }
+        release {
+            // ── R8 / Code Shrinking ─────────────────────────────────────────
+            // R8 full mode: enables all optimisations including inlining,
+            // class merging, enum unboxing, and dead code elimination.
+            isMinifyEnabled = true
+            isShrinkResources = true   // Remove unused resources
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            // Optimise DEX: use D8/R8 multi-dex and class-file optimisations.
+            // R8 full mode is activated via the gradle.properties flag below.
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -27,7 +75,11 @@ android {
         resources.excludes += setOf("META-INF/DEPENDENCIES", "META-INF/INDEX.LIST")
     }
 }
+
+// ─── Dependencies ────────────────────────────────────────────────────────────
+
 dependencies {
+    // Jetpack Compose BOM
     implementation(platform("androidx.compose:compose-bom:2025.04.01"))
     implementation("androidx.activity:activity-compose:1.10.1")
     implementation("androidx.compose.material3:material3")
@@ -38,14 +90,23 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
+
+    // yt-dlp + FFmpeg wrapper
     implementation("io.github.junkfood02.youtubedl-android:library:0.18.1")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:0.18.1")
+
     // Override old transitive versions while retaining the wrapper's public API.
     implementation("com.fasterxml.jackson.core:jackson-databind:2.18.3")
     implementation("commons-io:commons-io:2.18.0")
+
+    // ── BitTorrent (full flavor only) ────────────────────────────────────────
+    // libtorrent4j: Java/Kotlin bindings for the libtorrent native library.
+    // Only compiled into the "full" flavor — Play Store "standard" build is clean.
+    "fullImplementation"("org.libtorrent4j:libtorrent4j-android-arm64:2.1.0-29")
+
+    // Unit tests
     testImplementation("junit:junit:4.13.2")
 }
-
 
 dependencies {
     testImplementation("org.robolectric:robolectric:4.14.1")
@@ -56,4 +117,5 @@ dependencies {
     androidTestImplementation(platform("androidx.compose:compose-bom:2025.04.01"))
     androidTestImplementation("androidx.compose.ui:ui-test-junit4")
 }
+
 android { testOptions { unitTests.isIncludeAndroidResources = true } }

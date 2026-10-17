@@ -6,7 +6,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.*
 import org.videopocket.probe.core.AppSettings
-import org.videopocket.probe.download.ServiceController
 import org.videopocket.probe.engine.PocketNotifier
 
 class ProcessingModel(application: Application) : AndroidViewModel(application) {
@@ -45,23 +44,21 @@ class ProcessingModel(application: Application) : AndroidViewModel(application) 
         update = ProcessingUpdate(null, "COPYING")
         val engine = LocalMediaProcessor(getApplication())
         processor = engine
-        // Acquire foreground service so processing continues if user leaves the screen
-        ServiceController.acquire(getApplication())
         viewModelScope.launch {
             try {
                 result = withContext(Dispatchers.IO + NonCancellable) {
                     engine.run(request) { progress ->
                         viewModelScope.launch {
                             update = progress
-                            // Post a processing notification so the user can track progress
+                            // Post a progress notification while processing
                             val percent = progress.percent?.toInt() ?: -1
                             val stageLabel = when (progress.stage) {
-                                "COPYING" -> if (AppSettings.isArabic) "نسخ الملف…" else "Copying file…"
-                                "ENCODING" -> if (AppSettings.isArabic) "ترميز الفيديو…" else "Encoding…"
-                                "OPTIMIZING" -> if (AppSettings.isArabic) "تحسين الجودة…" else "Optimizing…"
-                                "VALIDATING" -> if (AppSettings.isArabic) "التحقق من المخرجات…" else "Validating…"
-                                "SAVING" -> if (AppSettings.isArabic) "حفظ في المكتبة…" else "Saving…"
-                                else -> progress.stage
+                                "COPYING"    -> if (AppSettings.isArabic) "نسخ الملف…"           else "Copying file…"
+                                "ENCODING"   -> if (AppSettings.isArabic) "ترميز الفيديو…"        else "Encoding…"
+                                "OPTIMIZING" -> if (AppSettings.isArabic) "تحسين الجودة…"         else "Optimizing…"
+                                "VALIDATING" -> if (AppSettings.isArabic) "التحقق من المخرجات…"   else "Validating…"
+                                "SAVING"     -> if (AppSettings.isArabic) "حفظ في المكتبة…"       else "Saving…"
+                                else         -> progress.stage
                             }
                             val notifTitle = if (AppSettings.isArabic) "معالجة الوسائط" else "Processing media"
                             PocketNotifier.showProcessingProgress(getApplication(), notifTitle, percent, stageLabel)
@@ -80,7 +77,6 @@ class ProcessingModel(application: Application) : AndroidViewModel(application) 
             } finally {
                 busy = false
                 processor = null
-                ServiceController.release(getApplication())
             }
         }
     }
@@ -94,8 +90,6 @@ class ProcessingModel(application: Application) : AndroidViewModel(application) 
 
     override fun onCleared() {
         processor?.cancel()
-        // If the ViewModel is cleared while processing, release the service
-        if (busy) ServiceController.release(getApplication())
         super.onCleared()
     }
 }

@@ -57,7 +57,7 @@ fun IdmScreen(arabic: Boolean) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
     ) {
-        // ── Hero Section / Header ──────────────────────────────────────────
+        // â”€â”€ Hero Section / Header â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -81,14 +81,14 @@ fun IdmScreen(arabic: Boolean) {
                                 Icon(Icons.Default.Speed, contentDescription = null, tint = MaterialTheme.colorScheme.onPrimary, modifier = Modifier.size(20.dp))
                             }
                             Text(
-                                text = t("IDM Downloader", "تحميل الملفات (IDM)"),
+                                text = t("IDM Downloader", "ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ù…Ù„ÙØ§Øª (IDM)"),
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = t("Multi-threaded parallel download accelerator", "مسرِّع التحميل متعدد المسارات المتوازية"),
+                            text = t("Multi-threaded parallel download accelerator", "Ù…Ø³Ø±ÙÙ‘Ø¹ Ø§Ù„ØªØ­Ù…ÙŠÙ„ Ù…ØªØ¹Ø¯Ø¯ Ø§Ù„Ù…Ø³Ø§Ø±Ø§Øª Ø§Ù„Ù…ØªÙˆØ§Ø²ÙŠØ©"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -104,7 +104,7 @@ fun IdmScreen(arabic: Boolean) {
             }
         }
 
-        // ── Input & Inspection Card ────────────────────────────────────────
+        // â”€â”€ Input & Inspection Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -116,7 +116,7 @@ fun IdmScreen(arabic: Boolean) {
                     OutlinedTextField(
                         value = idmUrlInput,
                         onValueChange = { idmUrlInput = it },
-                        label = { Text(t("Direct Download URL (HTTP / HTTPS)", "رابط مباشر للتحميل (HTTP / HTTPS)")) },
+                        label = { Text(t("Direct Download URL (HTTP / HTTPS)", "Ø±Ø§Ø¨Ø· Ù…Ø¨Ø§Ø´Ø± Ù„Ù„ØªØ­Ù…ÙŠÙ„ (HTTP / HTTPS)")) },
                         placeholder = { Text("https://example.com/file.zip") },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -125,7 +125,7 @@ fun IdmScreen(arabic: Boolean) {
                             IconButton(onClick = {
                                 clipboard.getText()?.text?.let { idmUrlInput = it.trim() }
                             }) {
-                                Icon(Icons.Default.ContentPaste, contentDescription = t("Paste", "لصق"))
+                                Icon(Icons.Default.ContentPaste, contentDescription = t("Paste", "Ù„ØµÙ‚"))
                             }
                         }
                     )
@@ -151,11 +151,11 @@ fun IdmScreen(arabic: Boolean) {
                             if (idmInspecting) {
                                 CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = MaterialTheme.colorScheme.onPrimary)
                                 Spacer(Modifier.width(8.dp))
-                                Text(t("Analyzing...", "جاري الفحص..."))
+                                Text(t("Analyzing...", "Ø¬Ø§Ø±ÙŠ Ø§Ù„ÙØ­Øµ..."))
                             } else {
                                 Icon(Icons.Default.TravelExplore, contentDescription = null, Modifier.size(18.dp))
                                 Spacer(Modifier.width(8.dp))
-                                Text(t("Examine Link", "فحص الرابط"))
+                                Text(t("Examine Link", "ÙØ­Øµ Ø§Ù„Ø±Ø§Ø¨Ø·"))
                             }
                         }
 
@@ -164,7 +164,7 @@ fun IdmScreen(arabic: Boolean) {
                                 onClick = { idmUrlInput = ""; idmInspectedTask = null },
                                 shape = RoundedCornerShape(12.dp)
                             ) {
-                                Icon(Icons.Default.Clear, contentDescription = t("Clear", "مسح"))
+                                Icon(Icons.Default.Clear, contentDescription = t("Clear", "Ù…Ø³Ø­"))
                             }
                         }
                     }
@@ -172,7 +172,7 @@ fun IdmScreen(arabic: Boolean) {
             }
         }
 
-        // ── Inspected Task Details Card ────────────────────────────────────
+        // â”€â”€ Inspected Task Details Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         item {
             AnimatedVisibility(
                 visible = idmInspectedTask != null,
@@ -224,14 +224,14 @@ fun IdmScreen(arabic: Boolean) {
                                 if (inspected.supportsRange) {
                                     SuggestionChip(
                                         onClick = {},
-                                        label = { Text(t("Parallel OK ⚡", "تجزئة متوازية ⚡"), color = MaterialTheme.colorScheme.tertiary) }
+                                        label = { Text(t("Parallel OK âš¡", "ØªØ¬Ø²Ø¦Ø© Ù…ØªÙˆØ§Ø²ÙŠØ© âš¡"), color = MaterialTheme.colorScheme.tertiary) }
                                     )
                                 }
                             }
 
                             // Parallel Connections Selector
                             Text(
-                                text = t("Parallel Connections (Speed Boost):", "عدد المسارات المتوازية (مضاعفة السرعة):"),
+                                text = t("Parallel Connections (Speed Boost):", "Ø¹Ø¯Ø¯ Ø§Ù„Ù…Ø³Ø§Ø±Ø§Øª Ø§Ù„Ù…ØªÙˆØ§Ø²ÙŠØ© (Ù…Ø¶Ø§Ø¹ÙØ© Ø§Ù„Ø³Ø±Ø¹Ø©):"),
                                 style = MaterialTheme.typography.bodySmall,
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -240,7 +240,7 @@ fun IdmScreen(arabic: Boolean) {
                                     FilterChip(
                                         selected = idmSegmentsChoice == threads,
                                         onClick = { idmSegmentsChoice = threads },
-                                        label = { Text("$threads ${t("threads", "مسارات")}") },
+                                        label = { Text("$threads ${t("threads", "Ù…Ø³Ø§Ø±Ø§Øª")}") },
                                         leadingIcon = if (idmSegmentsChoice == threads) {
                                             { Icon(Icons.Default.Bolt, contentDescription = null, Modifier.size(16.dp)) }
                                         } else null
@@ -269,7 +269,7 @@ fun IdmScreen(arabic: Boolean) {
                             ) {
                                 Icon(Icons.Default.RocketLaunch, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
-                                Text(t("Start Accelerated Download", "بدء التحميل المسرَّع"), fontWeight = FontWeight.Bold)
+                                Text(t("Start Accelerated Download", "Ø¨Ø¯Ø¡ Ø§Ù„ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ù…Ø³Ø±ÙŽÙ‘Ø¹"), fontWeight = FontWeight.Bold)
                             }
                         }
                     }
@@ -277,7 +277,7 @@ fun IdmScreen(arabic: Boolean) {
             }
         }
 
-        // ── Filter Chips ───────────────────────────────────────────────────
+        // â”€â”€ Filter Chips â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (idmTasks.isNotEmpty()) {
             item {
                 Row(
@@ -288,7 +288,7 @@ fun IdmScreen(arabic: Boolean) {
                     FilterChip(
                         selected = filterCategory == null,
                         onClick = { filterCategory = null },
-                        label = { Text(t("All (${idmTasks.size})", "الكل (${idmTasks.size})")) }
+                        label = { Text(t("All (${idmTasks.size})", "Ø§Ù„ÙƒÙ„ (${idmTasks.size})")) }
                     )
                     IdmCategory.entries.forEach { cat ->
                         val count = idmTasks.count { it.category == cat }
@@ -304,7 +304,7 @@ fun IdmScreen(arabic: Boolean) {
             }
         }
 
-        // ── Active Downloads List ──────────────────────────────────────────
+        // â”€â”€ Active Downloads List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (filteredTasks.isEmpty() && idmTasks.isEmpty()) {
             item {
                 Box(
@@ -314,12 +314,12 @@ fun IdmScreen(arabic: Boolean) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.outline)
                         Text(
-                            text = t("No active downloads", "لا توجد تنزيلات حالياً"),
+                            text = t("No active downloads", "Ù„Ø§ ØªÙˆØ¬Ø¯ ØªÙ†Ø²ÙŠÙ„Ø§Øª Ø­Ø§Ù„ÙŠØ§Ù‹"),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = t("Paste a direct file URL above to download at maximum speed", "الصق رابط ملف مباشر أعلاه للتحميل بأقصى سرعة ممكنة"),
+                            text = t("Paste a direct file URL above to download at maximum speed", "Ø§Ù„ØµÙ‚ Ø±Ø§Ø¨Ø· Ù…Ù„Ù Ù…Ø¨Ø§Ø´Ø± Ø£Ø¹Ù„Ø§Ù‡ Ù„Ù„ØªØ­Ù…ÙŠÙ„ Ø¨Ø£Ù‚ØµÙ‰ Ø³Ø±Ø¹Ø© Ù…Ù…ÙƒÙ†Ø©"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -348,6 +348,142 @@ fun IdmScreen(arabic: Boolean) {
                         idmTasks.remove(task)
                     }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun IdmTaskCard(
+    task: IdmTask,
+    arabic: Boolean,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit
+) {
+    fun t(en: String, ar: String) = if (arabic) ar else en
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val icon = when (task.category) {
+                        IdmCategory.VIDEO -> Icons.Default.VideoLibrary
+                        IdmCategory.AUDIO -> Icons.Default.Audiotrack
+                        IdmCategory.COMPRESSED -> Icons.Default.FolderZip
+                        IdmCategory.DOCUMENT -> Icons.Default.Description
+                        IdmCategory.PROGRAM -> Icons.Default.Android
+                        else -> Icons.Default.InsertDriveFile
+                    }
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = task.filename,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = if (arabic) task.state.arabicLabel else task.state.label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = when (task.state) {
+                                IdmState.DOWNLOADING -> MaterialTheme.colorScheme.primary
+                                IdmState.COMPLETED -> Color(0xFF2E7D32)
+                                IdmState.FAILED -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.outline
+                            }
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (task.state == IdmState.DOWNLOADING) {
+                        IconButton(onClick = onPause) {
+                            Icon(Icons.Default.Pause, contentDescription = "Pause")
+                        }
+                    } else if (task.state == IdmState.PAUSED || task.state == IdmState.FAILED) {
+                        IconButton(onClick = onResume) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
+                        }
+                    }
+                    IconButton(onClick = onCancel) {
+                        Icon(Icons.Default.Close, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            LinearProgressIndicator(
+                progress = { (task.progressPercent / 100f).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "${task.formattedDownloadedSize()} / ${task.formattedTotalSize()} (%.1f%%)".format(task.progressPercent),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                if (task.speedBytesPerSec > 0) {
+                    Text(
+                        text = "${task.formattedSpeed()} • ETA: ${task.formattedEta()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = FontWeight.SemiBold,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+            }
+
+            if (task.segments.isNotEmpty() && task.state == IdmState.DOWNLOADING) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(3.dp)
+                ) {
+                    task.segments.forEach { seg ->
+                        val segProgress = (seg.progressPercent / 100f).coerceIn(0f, 1f)
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .height(6.dp)
+                                .clip(RoundedCornerShape(3.dp))
+                                .background(MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxHeight()
+                                    .fillMaxWidth(segProgress)
+                                    .background(
+                                        if (seg.isCompleted) Color(0xFF2E7D32)
+                                        else MaterialTheme.colorScheme.primary
+                                    )
+                            )
+                        }
+                    }
+                }
             }
         }
     }

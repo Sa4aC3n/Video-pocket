@@ -321,6 +321,7 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
     val destinations = listOf(
         Triple(0, Icons.Default.Home, t("Home", "الرئيسية")),
         Triple(1, Icons.Default.Download, t("Queue", "التنزيلات")),
+        Triple(5, Icons.Default.Speed, t("IDM/Torrent", "تحميل IDM")),
         Triple(2, Icons.Default.VideoLibrary, t("Pocket", "مكتبتي")),
         Triple(4, Icons.Default.Tune, t("Studio", "استوديو")),
         Triple(3, Icons.Default.Settings, t("Settings", "الإعدادات"))
@@ -352,6 +353,7 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                                     onToggleLanguage = { AppSettings.setLanguage(!arabic) },
                                     onNavigateDownloads = { selectedTab = 1 }, onNavigatePocket = { selectedTab = 2 })
                                 1 -> DownloadsScreen(model, arabic)
+                                5 -> IdmScreen(arabic)
                                 2 -> LibraryScreen(model, arabic, onNavigateHome = { selectedTab = 0 }, onProcess = {
                                     processingUri = it.uriString; processingTitle = it.title; selectedTab = 4
                                 })
@@ -365,3 +367,4 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
         }
     }
 }
+

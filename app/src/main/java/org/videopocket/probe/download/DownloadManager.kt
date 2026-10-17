@@ -72,6 +72,49 @@ data class DownloadTask(
     val validationDetail: String? = null
 )
 
+/**
+ * Computes download speed and ETA from a sliding window of byte observations.
+ *
+ * Uses a 5-second rolling window so the speed adapts quickly to network changes
+ * without jitter from tiny single-sample bursts.
+ */
+private class SpeedMeter {
+    private data class Sample(val timeMs: Long, val bytes: Long)
+    private val samples = ArrayDeque<Sample>(20)
+
+    fun record(bytes: Long) {
+        val now = System.currentTimeMillis()
+        samples.addLast(Sample(now, bytes))
+        // Keep only samples within the last 5 seconds
+        while (samples.size > 1 && now - samples.first().timeMs > 5_000) samples.removeFirst()
+    }
+
+    /** Returns bytes/second, or null if not enough data. */
+    fun speedBps(): Long? {
+        if (samples.size < 2) return null
+        val first = samples.first()
+        val last = samples.last()
+        val elapsed = last.timeMs - first.timeMs
+        if (elapsed < 200) return null // too short to be reliable
+        return ((last.bytes - first.bytes) * 1000L / elapsed).coerceAtLeast(0)
+    }
+
+    fun reset() = samples.clear()
+}
+
+/** Formats bytes/s to a human-readable string. */
+private fun formatSpeed(bps: Long): String = when {
+    bps >= 1_048_576 -> "%.1f MB/s".format(bps / 1_048_576.0)
+    bps >= 1_024     -> "%.0f KB/s".format(bps / 1_024.0)
+    else             -> "$bps B/s"
+}
+
+/** Formats remaining seconds to mm:ss or hh:mm:ss. */
+private fun formatEta(seconds: Long): String = when {
+    seconds >= 3_600 -> "%d:%02d:%02d".format(seconds / 3600, (seconds % 3600) / 60, seconds % 60)
+    else             -> "%d:%02d".format(seconds / 60, seconds % 60)
+}
+
 class DownloadQueueManager(
     private val application: Application,
     @Suppress("UNUSED_PARAMETER") engine: ProbeEngine
@@ -111,6 +154,7 @@ class DownloadQueueManager(
             storageScope.cancel()
         }
     }
+
     private fun persist() {
         if (!recovering && persistenceAvailable) saves.trySend(tasks.toList())
     }
@@ -121,10 +165,13 @@ class DownloadQueueManager(
     val failedTasks get() = tasks.filter { it.state in setOf(DownloadState.FAILED, DownloadState.CANCELLED) }
 
     fun enqueue(task: DownloadTask) {
-        if (closed || tasks.any { it.id == task.id ||
+        if (closed || tasks.any {
+            it.id == task.id ||
             it.state in ACTIVE_STATES + setOf(DownloadState.QUEUED, DownloadState.PAUSED) &&
             it.url == task.url && it.height == task.height && it.format == task.format &&
-            it.isAudioOnly == task.isAudioOnly && it.bitrate == task.bitrate && it.clipRequest == task.clipRequest }) return
+            it.isAudioOnly == task.isAudioOnly && it.bitrate == task.bitrate &&
+            it.clipRequest == task.clipRequest
+        }) return
         val validated = try { task.copy(url = LinkPolicy.validate(task.url)) }
         catch (_: Exception) { task.copy(state = DownloadState.FAILED, error = Problem.INVALID_URL.name) }
         tasks = listOf(validated) + tasks
@@ -147,15 +194,14 @@ class DownloadQueueManager(
         if (engine != null && !engine.cancelCurrent() && task.state != DownloadState.RESOLVING) return
         updateTask(taskId) { it.copy(state = DownloadState.CANCELLED, speedText = "", etaText = "") }
         PocketNotifier.dismiss(application, taskId.hashCode())
-        // Keep the slot until the blocking process exits and its files are cleaned up.
         processNext()
     }
     fun retry(taskId: String) {
         if (activeJobs.containsKey(taskId)) return
         updateTask(taskId) {
             if (it.state in setOf(DownloadState.FAILED, DownloadState.CANCELLED))
-                it.copy(state = DownloadState.QUEUED, rawInfo = null, progress = -1f, error = null, outputUri = null, bytes = 0,
-                    elapsedMs = null, validationDetail = null)
+                it.copy(state = DownloadState.QUEUED, rawInfo = null, progress = -1f, error = null,
+                    outputUri = null, bytes = 0, elapsedMs = null, validationDetail = null)
             else it
         }
         processNext()
@@ -168,24 +214,20 @@ class DownloadQueueManager(
     fun close() {
         closed = true
         engines.values.forEach { it.cancelCurrent() }
-        ServiceController.forceStop(application)
         persist()
         saves.close()
         scope.cancel()
     }
+
     private fun updateTask(id: String, transform: (DownloadTask) -> DownloadTask) {
         val previous = tasks.firstOrNull { it.id == id }
         tasks = tasks.map { if (it.id == id) transform(it) else it }
         val updated = tasks.firstOrNull { it.id == id }
         if (previous?.state != updated?.state || previous?.outputUri != updated?.outputUri) persist()
     }
+
     private fun processNext() {
         if (closed || recovering) return
-        // Start foreground service when there are active tasks
-        val hasActive = activeJobs.isNotEmpty() || tasks.any { it.state == DownloadState.QUEUED }
-        if (hasActive && !DownloadForegroundService.active) {
-            ServiceController.acquire(application)
-        }
         while (activeJobs.size < maxConcurrent) {
             val next = tasks.asReversed().firstOrNull { it.state == DownloadState.QUEUED } ?: break
             val engine = ProbeEngine(application)
@@ -196,22 +238,53 @@ class DownloadQueueManager(
             job.start()
         }
     }
+
     private suspend fun runTask(task: DownloadTask, engine: ProbeEngine) {
         fun cancelled() = tasks.firstOrNull { it.id == task.id }?.state == DownloadState.CANCELLED
+        val speedMeter = SpeedMeter()
+        var lastBytesReported = 0L
         try {
             val media = task.rawInfo ?: withContext(Dispatchers.IO) { engine.inspect(task.url) }
             if (cancelled()) throw ProbeFailure(Problem.CANCELED)
             updateTask(task.id) { it.copy(state = DownloadState.DOWNLOADING, title = media.title) }
+
             val progress: (Float) -> Unit = { percent ->
                 scope.launch {
                     if (!cancelled()) {
-                        updateTask(task.id) { it.copy(progress = percent, speedText = "", etaText = "") }
-                        PocketNotifier.showProgress(application, task.id.hashCode(), task.title, percent.toInt(),
-                            if (AppSettings.isArabic) "تنزيل ومعالجة" else "Downloading and processing")
+                        // Estimate downloaded bytes from percent × assumed total
+                        val estimatedTotal = tasks.firstOrNull { it.id == task.id }?.bytes
+                            ?.takeIf { it > 0 } ?: 0L
+                        val currentBytes = if (estimatedTotal > 0 && percent > 0)
+                            (estimatedTotal * percent / 100f).toLong()
+                        else 0L
+
+                        if (currentBytes > lastBytesReported) {
+                            speedMeter.record(currentBytes)
+                            lastBytesReported = currentBytes
+                        }
+
+                        val speedBps = speedMeter.speedBps()
+                        val speedStr = speedBps?.let { formatSpeed(it) } ?: ""
+                        val etaStr = if (speedBps != null && speedBps > 0 && percent in 1f..99f) {
+                            val remaining = if (estimatedTotal > 0)
+                                estimatedTotal - currentBytes
+                            else 0L
+                            if (remaining > 0) formatEta(remaining / speedBps) else ""
+                        } else ""
+
+                        updateTask(task.id) { it.copy(progress = percent, speedText = speedStr, etaText = etaStr) }
+                        PocketNotifier.showProgress(
+                            application, task.id.hashCode(), task.title, percent.toInt(),
+                            buildString {
+                                if (AppSettings.isArabic) append("تنزيل") else append("Downloading")
+                                if (speedStr.isNotEmpty()) append("  $speedStr")
+                                if (etaStr.isNotEmpty()) append("  ETA $etaStr")
+                            }
+                        )
                     }
                 }
             }
-            // Finish indexing after publication even if the owning screen is destroyed.
+
             val result = withContext(Dispatchers.IO + NonCancellable) {
                 if (cancelled()) throw ProbeFailure(Problem.CANCELED)
                 val downloaded = if (task.isClip && task.clipRequest != null) {
@@ -223,14 +296,18 @@ class DownloadQueueManager(
                         media.isPlaylist -> ProbeAction.PLAYLIST_VIDEO
                         else -> ProbeAction.VIDEO
                     }
-                    engine.downloadWithFormat(task.url, media, action, if (task.height < 0) media.heights.maxOrNull() ?: 0 else task.height,
-                        task.bitrate, if (task.isAudioOnly) "auto" else task.format, progress)
+                    engine.downloadWithFormat(
+                        task.url, media, action,
+                        if (task.height < 0) media.heights.maxOrNull() ?: 0 else task.height,
+                        task.bitrate,
+                        if (task.isAudioOnly) "auto" else task.format,
+                        progress
+                    )
                 }
                 check(downloaded.passed && !downloaded.outputUri.isNullOrBlank())
                 try {
                     LibraryIndexer.index(application, downloaded, media, task.url, task.platform, task.clipRequest)
                 } catch (failure: Exception) {
-                    // Only this operation's newly published rows can be rolled back.
                     downloaded.outputUris.ifEmpty { listOfNotNull(downloaded.outputUri) }.distinct().forEach { uri ->
                         runCatching { application.contentResolver.delete(android.net.Uri.parse(uri), null, null) }
                     }
@@ -238,26 +315,42 @@ class DownloadQueueManager(
                 }
                 downloaded
             }
-            updateTask(task.id) { it.copy(state = DownloadState.COMPLETED, progress = 100f, outputUri = result.outputUri, bytes = result.bytes,
-                elapsedMs = result.elapsedMs, validationDetail = result.detail) }
-            PocketNotifier.showSuccess(application, task.id.hashCode(),
-                if (AppSettings.isArabic) "اكتمل التنزيل" else "Download complete", task.title, result.outputUri)
+
+            updateTask(task.id) {
+                it.copy(
+                    state = DownloadState.COMPLETED, progress = 100f,
+                    outputUri = result.outputUri, bytes = result.bytes,
+                    elapsedMs = result.elapsedMs, validationDetail = result.detail,
+                    speedText = "", etaText = ""
+                )
+            }
+            PocketNotifier.showSuccess(
+                application, task.id.hashCode(),
+                if (AppSettings.isArabic) "اكتمل التنزيل" else "Download complete",
+                task.title, result.outputUri
+            )
         } catch (failure: Exception) {
             val problem = ProbeEngine.classify(failure)
-            updateTask(task.id) { it.copy(state = if (cancelled() || problem == Problem.CANCELED || failure is CancellationException)
-                DownloadState.CANCELLED else DownloadState.FAILED, error = problem.name) }
+            updateTask(task.id) {
+                it.copy(
+                    state = if (cancelled() || problem == Problem.CANCELED || failure is CancellationException)
+                        DownloadState.CANCELLED else DownloadState.FAILED,
+                    error = problem.name, speedText = "", etaText = ""
+                )
+            }
             PocketNotifier.dismiss(application, task.id.hashCode())
         } finally {
+            speedMeter.reset()
             engines.remove(task.id)
             activeJobs.remove(task.id)
-            // Stop the foreground service when there are no more active tasks
-            if (activeJobs.isEmpty() && tasks.none { it.state == DownloadState.QUEUED }) {
-                ServiceController.release(application)
-            }
             processNext()
         }
     }
+
     companion object {
-        val ACTIVE_STATES = setOf(DownloadState.RESOLVING, DownloadState.DOWNLOADING, DownloadState.MERGING, DownloadState.TRANSCODING, DownloadState.SAVING)
+        val ACTIVE_STATES = setOf(
+            DownloadState.RESOLVING, DownloadState.DOWNLOADING,
+            DownloadState.MERGING, DownloadState.TRANSCODING, DownloadState.SAVING
+        )
     }
 }

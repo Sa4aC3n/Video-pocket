@@ -7,16 +7,22 @@ import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -39,11 +45,13 @@ import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     private var sharedText by mutableStateOf("")
+
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         sharedText = if (intent.action == Intent.ACTION_SEND) intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty() else ""
     }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
@@ -133,6 +141,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
 
     var libraryError by mutableStateOf(false)
         private set
+
     fun refreshLibrary() {
         viewModelScope.launch {
             try {
@@ -141,21 +150,23 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
             } catch (_: Exception) { libraryError = true }
         }
     }
+
     override fun onCleared() {
         engine.cancelCurrent()
         queueManager.close()
         super.onCleared()
     }
 
-
     var libraryActionError by mutableStateOf(false)
         private set
+
     private fun mutateLibrary(action: () -> Unit) {
         viewModelScope.launch {
             try { withContext(Dispatchers.IO) { action() }; libraryActionError = false; refreshLibrary() }
             catch (_: Exception) { libraryActionError = true }
         }
     }
+
     fun deleteLibraryItem(id: String) = mutateLibrary { PocketLibraryManager.deleteItem(getApplication(), id) }
     fun renameLibraryItem(id: String, title: String) = mutateLibrary { PocketLibraryManager.renameItem(getApplication(), id, title.trim()) }
     fun toggleFavorite(id: String) = mutateLibrary { PocketLibraryManager.toggleFavorite(getApplication(), id) }
@@ -283,7 +294,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
 
     fun report(): String = JSONObject().put("app", "Video Pocket ${BuildConfig.VERSION_NAME}")
         .put("generatedAt", Instant.now().toString()).put("runtime", runtime)
-        .put("scope", "Foreground downloads, persistent queue and local media processing")
+        .put("scope", "Persistent queue and local media processing")
         .put("queue", JSONArray(queueManager.tasks.map { JSONObject().put("state", it.state.name).put("bytes", it.bytes)
             .put("elapsedMs", it.elapsedMs ?: JSONObject.NULL).put("validationDetail", it.validationDetail ?: JSONObject.NULL)
             .put("error", it.error ?: "") }))
@@ -311,6 +322,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
@@ -318,47 +330,151 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
     var processingTitle by rememberSaveable { mutableStateOf<String?>(null) }
     val arabic = AppSettings.isArabic
     fun t(en: String, ar: String) = if (arabic) ar else en
+
+    // ── Dedicated Core Pillars ─────────────────────────────────────────────
     val destinations = listOf(
-        Triple(0, Icons.Default.Home, t("Home", "الرئيسية")),
+        Triple(0, Icons.Default.PlayCircle, t("Videos", "فيديو")),
+        Triple(5, Icons.Default.Speed, t("IDM", "تحميل IDM")),
+        Triple(6, Icons.Default.CloudDownload, t("Torrent", "تورنت")),
         Triple(1, Icons.Default.Download, t("Queue", "التنزيلات")),
-        Triple(5, Icons.Default.Speed, t("IDM/Torrent", "تحميل IDM")),
         Triple(2, Icons.Default.VideoLibrary, t("Pocket", "مكتبتي")),
-        Triple(4, Icons.Default.Tune, t("Studio", "استوديو")),
         Triple(3, Icons.Default.Settings, t("Settings", "الإعدادات"))
     )
+
     CompositionLocalProvider(LocalLayoutDirection provides if (arabic) LayoutDirection.Rtl else LayoutDirection.Ltr) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= 840.dp
-            Scaffold(contentWindowInsets = WindowInsets.systemBars, bottomBar = {
-                if (!expanded) NavigationBar {
-                    destinations.forEach { (id, icon, label) ->
-                        NavigationBarItem(selected = selectedTab == id, onClick = { selectedTab = id },
-                            icon = { Icon(icon, contentDescription = null) }, label = { Text(label, maxLines = 1) })
-                    }
-                }
-            }) { insets ->
-                Row(Modifier.padding(insets).fillMaxSize()) {
-                    if (expanded) NavigationRail(modifier = Modifier.width(
-                        if (androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f) 120.dp else 88.dp
-                    )) {
-                        destinations.forEach { (id, icon, label) ->
-                            NavigationRailItem(selected = selectedTab == id, onClick = { selectedTab = id },
-                                icon = { Icon(icon, contentDescription = null) }, label = { Text(label) })
+            Scaffold(
+                contentWindowInsets = WindowInsets.systemBars,
+                topBar = {
+                    TopAppBar(
+                        title = {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.PlayCircle,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(28.dp)
+                                )
+                                Text(
+                                    text = "Video Pocket",
+                                    fontWeight = FontWeight.Bold,
+                                    style = MaterialTheme.typography.titleLarge
+                                )
+                                Badge(
+                                    containerColor = MaterialTheme.colorScheme.primaryContainer,
+                                    contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                                ) {
+                                    Text("3.0", modifier = Modifier.padding(2.dp), fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        },
+                        actions = {
+                            // Instant 1-tap Theme Switcher (Light / Dark)
+                            val isDark = when (AppSettings.themeMode) {
+                                ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                                ThemeMode.LIGHT -> false
+                                ThemeMode.DARK -> true
+                            }
+                            IconButton(onClick = {
+                                AppSettings.setTheme(if (isDark) ThemeMode.LIGHT else ThemeMode.DARK)
+                            }) {
+                                Icon(
+                                    imageVector = if (isDark) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                    contentDescription = t("Toggle Theme", "تبديل المظهر"),
+                                    tint = if (isDark) Color(0xFFFBBF24) else MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            // Instant 1-tap Language Switcher
+                            TextButton(
+                                onClick = { AppSettings.setLanguage(!arabic) },
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text(
+                                    text = if (arabic) "English" else "العربية",
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                        },
+                        colors = TopAppBarDefaults.topAppBarColors(
+                            containerColor = MaterialTheme.colorScheme.background
+                        )
+                    )
+                },
+                bottomBar = {
+                    if (!expanded) {
+                        NavigationBar(
+                            containerColor = MaterialTheme.colorScheme.surface,
+                            tonalElevation = 8.dp
+                        ) {
+                            destinations.forEach { (id, icon, label) ->
+                                NavigationBarItem(
+                                    selected = selectedTab == id,
+                                    onClick = { selectedTab = id },
+                                    icon = { Icon(icon, contentDescription = null) },
+                                    label = { Text(label, maxLines = 1, fontSize = 11.sp, fontWeight = if (selectedTab == id) FontWeight.Bold else FontWeight.Normal) }
+                                )
+                            }
                         }
                     }
-                    Box(Modifier.weight(1f).fillMaxHeight(), contentAlignment = androidx.compose.ui.Alignment.TopCenter) {
+                }
+            ) { insets ->
+                Row(Modifier.padding(insets).fillMaxSize()) {
+                    if (expanded) {
+                        NavigationRail(
+                            modifier = Modifier.width(
+                                if (androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.3f) 120.dp else 96.dp
+                            ),
+                            containerColor = MaterialTheme.colorScheme.surface
+                        ) {
+                            destinations.forEach { (id, icon, label) ->
+                                NavigationRailItem(
+                                    selected = selectedTab == id,
+                                    onClick = { selectedTab = id },
+                                    icon = { Icon(icon, contentDescription = null) },
+                                    label = { Text(label, fontSize = 12.sp) }
+                                )
+                            }
+                        }
+                    }
+                    Box(
+                        modifier = Modifier.weight(1f).fillMaxHeight(),
+                        contentAlignment = Alignment.TopCenter
+                    ) {
                         Box(Modifier.widthIn(max = 1000.dp).fillMaxSize()) {
                             when (selectedTab) {
-                                0 -> HomeScreen(sharedIntent, model, arabic,
+                                0 -> HomeScreen(
+                                    sharedIntent = sharedIntent,
+                                    model = model,
+                                    arabic = arabic,
                                     onToggleLanguage = { AppSettings.setLanguage(!arabic) },
-                                    onNavigateDownloads = { selectedTab = 1 }, onNavigatePocket = { selectedTab = 2 })
-                                1 -> DownloadsScreen(model, arabic)
-                                5 -> IdmScreen(arabic)
-                                2 -> LibraryScreen(model, arabic, onNavigateHome = { selectedTab = 0 }, onProcess = {
-                                    processingUri = it.uriString; processingTitle = it.title; selectedTab = 4
-                                })
-                                4 -> ProcessingScreen(arabic, processingUri, processingTitle)
-                                3 -> SettingsScreen(model, arabic, onToggleLanguage = { AppSettings.setLanguage(!arabic) })
+                                    onNavigateDownloads = { selectedTab = 1 },
+                                    onNavigatePocket = { selectedTab = 2 }
+                                )
+                                5 -> IdmScreen(arabic = arabic)
+                                6 -> TorrentScreen(arabic = arabic)
+                                1 -> DownloadsScreen(model = model, arabic = arabic)
+                                2 -> LibraryScreen(
+                                    model = model,
+                                    arabic = arabic,
+                                    onNavigateHome = { selectedTab = 0 },
+                                    onProcess = {
+                                        processingUri = it.uriString
+                                        processingTitle = it.title
+                                        selectedTab = 4
+                                    }
+                                )
+                                4 -> ProcessingScreen(arabic = arabic, initialUri = processingUri, initialTitle = processingTitle)
+                                3 -> SettingsScreen(
+                                    model = model,
+                                    arabic = arabic,
+                                    onToggleLanguage = { AppSettings.setLanguage(!arabic) }
+                                )
                             }
                         }
                     }
@@ -367,4 +483,3 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
         }
     }
 }
-

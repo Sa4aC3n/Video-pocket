@@ -21,15 +21,26 @@ android {
         buildConfigField("boolean", "ENABLE_TORRENT", "true")
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("videopocket-release.jks")
+            storePassword = "VideoPocket2026!"
+            keyAlias = "videopocket"
+            keyPassword = "VideoPocket2026!"
+            enableV1Signing = true
+            enableV2Signing = true
+        }
+    }
+
     buildTypes {
         debug {
             isMinifyEnabled = false
             isShrinkResources = false
         }
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
-            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

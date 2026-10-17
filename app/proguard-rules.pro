@@ -53,12 +53,16 @@
 -keep class org.videopocket.probe.core.** { *; }
 -keep class org.videopocket.probe.download.DownloadTask { *; }
 -keep class org.videopocket.probe.download.DownloadState { *; }
+-keep class org.videopocket.probe.idm.** { *; }
+-keep class org.videopocket.probe.torrent.** { *; }
 -keep class org.videopocket.probe.processing.ProcessingRequest { *; }
 -keep class org.videopocket.probe.processing.ProcessingCapabilities { *; }
 -keep class org.videopocket.probe.processing.CompressionPreset { *; }
 -keep class org.videopocket.probe.processing.ProcessingMode { *; }
 -keep class org.videopocket.probe.resolver.** { *; }
 -keep class org.videopocket.probe.engine.** { *; }
+
+-optimizationpasses 5
 
 # ── yt-dlp / youtubedl-android wrapper ───────────────────────────────────────
 # The wrapper uses reflection and JNI to communicate with the yt-dlp binary.

@@ -70,7 +70,7 @@ fun TorrentScreen(arabic: Boolean) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
     ) {
-        // ── Hero Section / Swarm Dashboard ─────────────────────────────────
+        // â”€â”€ Hero Section / Swarm Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -94,13 +94,13 @@ fun TorrentScreen(arabic: Boolean) {
                                 Icon(Icons.Default.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiary, modifier = Modifier.size(20.dp))
                             }
                             Text(
-                                text = t("BitTorrent Client", "محرك التورنت (uTorrent)"),
+                                text = t("BitTorrent Client", "Ù…Ø­Ø±Ùƒ Ø§Ù„ØªÙˆØ±Ù†Øª (uTorrent)"),
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Badge(containerColor = MaterialTheme.colorScheme.tertiary, contentColor = MaterialTheme.colorScheme.onTertiary) {
-                            Text(t("P2P Swarm", "شبكة P2P"), modifier = Modifier.padding(4.dp), fontWeight = FontWeight.Bold)
+                            Text(t("P2P Swarm", "Ø´Ø¨ÙƒØ© P2P"), modifier = Modifier.padding(4.dp), fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -110,15 +110,15 @@ fun TorrentScreen(arabic: Boolean) {
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(t("Download Speed", "سرعة التنزيل"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("⬇ ${TorrentTask.formatSpeed(totalDownSpeed)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text(t("Download Speed", "Ø³Ø±Ø¹Ø© Ø§Ù„ØªÙ†Ø²ÙŠÙ„"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("â¬‡ ${TorrentTask.formatSpeed(totalDownSpeed)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(t("Upload Speed", "سرعة الرفع"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("⬆ ${TorrentTask.formatSpeed(totalUpSpeed)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
+                            Text(t("Upload Speed", "Ø³Ø±Ø¹Ø© Ø§Ù„Ø±ÙØ¹"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("â¬† ${TorrentTask.formatSpeed(totalUpSpeed)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(t("Torrents", "التورنتات"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text(t("Torrents", "Ø§Ù„ØªÙˆØ±Ù†ØªØ§Øª"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             Text("${torrentTasks.size}", fontWeight = FontWeight.Bold)
                         }
                     }
@@ -126,7 +126,7 @@ fun TorrentScreen(arabic: Boolean) {
             }
         }
 
-        // ── Input & File Opener Card ───────────────────────────────────────
+        // â”€â”€ Input & File Opener Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -138,7 +138,7 @@ fun TorrentScreen(arabic: Boolean) {
                     OutlinedTextField(
                         value = magnetInput,
                         onValueChange = { magnetInput = it },
-                        label = { Text(t("Magnet Link (magnet:?xt=...)", "رابط ماجنت (magnet:?xt=...)")) },
+                        label = { Text(t("Magnet Link (magnet:?xt=...)", "Ø±Ø§Ø¨Ø· Ù…Ø§Ø¬Ù†Øª (magnet:?xt=...)")) },
                         placeholder = { Text("magnet:?xt=urn:btih:...") },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -147,7 +147,7 @@ fun TorrentScreen(arabic: Boolean) {
                             IconButton(onClick = {
                                 clipboard.getText()?.text?.let { magnetInput = it.trim() }
                             }) {
-                                Icon(Icons.Default.ContentPaste, contentDescription = t("Paste", "لصق"))
+                                Icon(Icons.Default.ContentPaste, contentDescription = t("Paste", "Ù„ØµÙ‚"))
                             }
                         }
                     )
@@ -178,7 +178,7 @@ fun TorrentScreen(arabic: Boolean) {
                         ) {
                             Icon(Icons.Default.Download, contentDescription = null, Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(t("Download Magnet", "تحميل الماجنت"))
+                            Text(t("Download Magnet", "ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ù…Ø§Ø¬Ù†Øª"))
                         }
 
                         OutlinedButton(
@@ -189,14 +189,14 @@ fun TorrentScreen(arabic: Boolean) {
                         ) {
                             Icon(Icons.Default.FolderOpen, contentDescription = null, Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text(t(".torrent File", "ملف تورنت"))
+                            Text(t(".torrent File", "Ù…Ù„Ù ØªÙˆØ±Ù†Øª"))
                         }
                     }
                 }
             }
         }
 
-        // ── Torrents List ──────────────────────────────────────────────────
+        // â”€â”€ Torrents List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
         if (torrentTasks.isEmpty()) {
             item {
                 Box(
@@ -206,12 +206,12 @@ fun TorrentScreen(arabic: Boolean) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.outline)
                         Text(
-                            text = t("No torrents added yet", "لم يتم إضافة أي تورنت بعد"),
+                            text = t("No torrents added yet", "Ù„Ù… ÙŠØªÙ… Ø¥Ø¶Ø§ÙØ© Ø£ÙŠ ØªÙˆØ±Ù†Øª Ø¨Ø¹Ø¯"),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = t("Paste a magnet URI or open a .torrent file to download", "الصق رابط ماجنت أو اختر ملف .torrent لبدء التنزيل والمشاركة"),
+                            text = t("Paste a magnet URI or open a .torrent file to download", "Ø§Ù„ØµÙ‚ Ø±Ø§Ø¨Ø· Ù…Ø§Ø¬Ù†Øª Ø£Ùˆ Ø§Ø®ØªØ± Ù…Ù„Ù .torrent Ù„Ø¨Ø¯Ø¡ Ø§Ù„ØªÙ†Ø²ÙŠÙ„ ÙˆØ§Ù„Ù…Ø´Ø§Ø±ÙƒØ©"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )
@@ -240,6 +240,123 @@ fun TorrentScreen(arabic: Boolean) {
                         torrentTasks.remove(task)
                     }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun TorrentTaskCard(
+    task: TorrentTask,
+    arabic: Boolean,
+    onPause: () -> Unit,
+    onResume: () -> Unit,
+    onCancel: () -> Unit
+) {
+    fun t(en: String, ar: String) = if (arabic) ar else en
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+        )
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    modifier = Modifier.weight(1f),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudDownload,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier = Modifier.size(24.dp)
+                    )
+                    Spacer(modifier = Modifier.width(10.dp))
+                    Column {
+                        Text(
+                            text = task.name,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 1
+                        )
+                        Text(
+                            text = if (arabic) task.state.arabicLabel else task.state.label,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = when (task.state) {
+                                TorrentState.DOWNLOADING, TorrentState.SEEDING -> MaterialTheme.colorScheme.primary
+                                TorrentState.COMPLETED -> androidx.compose.ui.graphics.Color(0xFF2E7D32)
+                                TorrentState.FAILED -> MaterialTheme.colorScheme.error
+                                else -> MaterialTheme.colorScheme.outline
+                            }
+                        )
+                    }
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (task.state == TorrentState.DOWNLOADING || task.state == TorrentState.SEEDING) {
+                        IconButton(onClick = onPause) {
+                            Icon(Icons.Default.Pause, contentDescription = "Pause")
+                        }
+                    } else if (task.state == TorrentState.PAUSED || task.state == TorrentState.FAILED) {
+                        IconButton(onClick = onResume) {
+                            Icon(Icons.Default.PlayArrow, contentDescription = "Resume")
+                        }
+                    }
+                    IconButton(onClick = onCancel) {
+                        Icon(Icons.Default.Close, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.error)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(10.dp))
+
+            LinearProgressIndicator(
+                progress = { (task.progressPercent / 100f).coerceIn(0f, 1f) },
+                modifier = Modifier.fillMaxWidth().height(8.dp).clip(CircleShape)
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = "${task.formattedDownloadedSize()} / ${task.formattedTotalSize()} (%.1f%%)".format(task.progressPercent),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                Text(
+                    text = "↓ ${task.formattedDownSpeed()} • ↑ ${task.formattedUpSpeed()}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.primary
+                )
+            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(
+                    text = t("Peers: ${task.peersCount} • Seeds: ${task.seedsCount}", "النظراء: ${task.peersCount} • المتصلون: ${task.seedsCount}"),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.outline
+                )
+                if (task.etaSeconds > 0) {
+                    Text(
+                        text = "ETA: ${task.formattedEta()}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.outline
+                    )
+                }
             }
         }
     }

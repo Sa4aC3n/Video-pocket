@@ -35,7 +35,7 @@ class UiRegressionTest {
             assertTrue(AppSettings.isArabic)
             compose.onNodeWithText("تلقائي حسب النظام").performClick().assertIsSelected()
             assertEquals(ThemeMode.SYSTEM, AppSettings.themeMode)
-            compose.onNodeWithText("الرئيسية").performClick()
+            compose.onNodeWithText("فيديو").performClick()
             compose.onNodeWithText("الصق رابط الفيديو").assertIsDisplayed()
             saveScreenshot("arabic-system.png")
             assertNavigationDirection(arabic = true)
@@ -54,7 +54,8 @@ class UiRegressionTest {
     private fun isTabletRun() = androidx.test.platform.app.InstrumentationRegistry.getArguments().getString("tabletUi") == "true"
 
     private fun assertNavigationDirection(arabic: Boolean) {
-        val home = compose.onNodeWithText(if (arabic) "الرئيسية" else "Home").fetchSemanticsNode().boundsInRoot
+        // First navigation destination: "Videos" ("فيديو"); it was "Home" before the IDM/Torrent tabs were added.
+        val home = compose.onNodeWithText(if (arabic) "فيديو" else "Videos").fetchSemanticsNode().boundsInRoot
         val settings = compose.onNodeWithText(if (arabic) "الإعدادات" else "Settings").fetchSemanticsNode().boundsInRoot
         val vertical = kotlin.math.abs(home.center.y - settings.center.y) > 40f
         val prefix = if (isTabletRun()) "tablet-" else ""

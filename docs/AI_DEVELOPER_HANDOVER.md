@@ -106,20 +106,20 @@ In `app/proguard-rules.pro`:
 ---
 
 ## 🔑 5. Production Keystore & Signing Configuration
-The production release keystore is embedded in `app/videopocket-release.jks` and configured in `signingConfigs.release`:
+The release keystore and its passwords are **not stored in the repository**. `app/build.gradle.kts` reads them from
+environment variables or Gradle properties; without them `assembleRelease` / `bundleRelease` produce **unsigned** artifacts.
 
-| Parameter | Value |
+| Variable (env or `~/.gradle/gradle.properties`) | Meaning |
 |---|---|
-| **Keystore File** | `app/videopocket-release.jks` |
-| **Store Password** | `VideoPocket2026!` |
-| **Key Alias** | `videopocket` |
-| **Key Password** | `VideoPocket2026!` |
-| **Key Algorithm** | 2048-bit RSA with SHA256withRSA |
-| **Validity** | 10,000 days (Valid until March 2054) |
-| **Certificate Owner** | `CN=Video Pocket, OU=Mobile, O=VideoPocket, L=Cairo, ST=Cairo, C=EG` |
-| **SHA-256 Fingerprint** | `96:64:27:A2:C2:1F:30:33:83:2E:A9:05:0B:CB:F5:67:7C:5C:C8:07:80:92:34:01:15:E7:15:8A:F4:91:50:16` |
+| `VIDEOPOCKET_KEYSTORE_FILE` | Absolute path to the `.jks` file (kept outside the repo) |
+| `VIDEOPOCKET_KEYSTORE_PASSWORD` | Keystore password |
+| `VIDEOPOCKET_KEY_ALIAS` | Key alias |
+| `VIDEOPOCKET_KEY_PASSWORD` | Key password |
 
-> ⚠️ **CRITICAL FOR UPDATES:** Always sign future app versions with this exact keystore. Google Play will reject any update signed with a different key!
+In GitHub Actions, store these as repository secrets (the keystore as a base64 secret decoded to a temp file in the job).
+
+> ⚠️ The previous keystore and password were committed to this public repository and must be treated as **compromised**.
+> Generate a new key. If the old one was registered with Google Play, rotate the upload key through Play Console.
 
 ---
 
@@ -127,7 +127,7 @@ The production release keystore is embedded in `app/videopocket-release.jks` and
 The latest release files are saved in `C:\Users\mohamed.keshka\Downloads\`:
 1. **`VideoPocket-v0.3.0-GooglePlay.aab`** (124.3 MB) — Production signed App Bundle for Google Play Console upload.
 2. **`VideoPocket-v0.3.0-release-signed.apk`** (129.5 MB) — Production signed APK for sideloading/direct testing.
-3. **`videopocket-release.jks`** (2.25 KB) — Standalone backup of the release keystore.
+3. A backup of the release keystore must be kept **outside the repository** (password manager / secure storage).
 
 ---
 
@@ -159,7 +159,7 @@ Key context:
    - Queue / Downloads
    - Library & Settings
 3. Google Play Compliance: No foreground services or restricted data sync permissions.
-4. Signing: Production keystore is in `app/videopocket-release.jks` (alias: videopocket).
+4. Signing: keystore and passwords come from environment variables / Gradle properties (see section 5). Never commit them.
 5. R8 full mode and ProGuard optimization passes are fully configured.
 6. The CI/CD pipeline builds both `assembleRelease` (.apk) and `bundleRelease` (.aab) automatically.
 

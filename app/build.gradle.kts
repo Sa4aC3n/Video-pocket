@@ -21,14 +21,30 @@ android {
         buildConfigField("boolean", "ENABLE_TORRENT", "true")
     }
 
+    // Release signing secrets are never stored in the repository. Provide them through
+    // environment variables (e.g. GitHub Actions secrets) or ~/.gradle/gradle.properties.
+    // Without them the release build is produced unsigned.
+    val releaseStoreFile = providers.environmentVariable("VIDEOPOCKET_KEYSTORE_FILE")
+        .orElse(providers.gradleProperty("VIDEOPOCKET_KEYSTORE_FILE")).orNull
+    val releaseStorePassword = providers.environmentVariable("VIDEOPOCKET_KEYSTORE_PASSWORD")
+        .orElse(providers.gradleProperty("VIDEOPOCKET_KEYSTORE_PASSWORD")).orNull
+    val releaseKeyAlias = providers.environmentVariable("VIDEOPOCKET_KEY_ALIAS")
+        .orElse(providers.gradleProperty("VIDEOPOCKET_KEY_ALIAS")).orNull
+    val releaseKeyPassword = providers.environmentVariable("VIDEOPOCKET_KEY_PASSWORD")
+        .orElse(providers.gradleProperty("VIDEOPOCKET_KEY_PASSWORD")).orNull
+    val hasReleaseSigning = listOf(releaseStoreFile, releaseStorePassword, releaseKeyAlias, releaseKeyPassword)
+        .all { !it.isNullOrBlank() } && file(releaseStoreFile!!).exists()
+
     signingConfigs {
-        create("release") {
-            storeFile = file("videopocket-release.jks")
-            storePassword = "VideoPocket2026!"
-            keyAlias = "videopocket"
-            keyPassword = "VideoPocket2026!"
-            enableV1Signing = true
-            enableV2Signing = true
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+            }
         }
     }
 
@@ -40,7 +56,7 @@ android {
         release {
             isMinifyEnabled = true
             isShrinkResources = true
-            signingConfig = signingConfigs.getByName("release")
+            if (hasReleaseSigning) signingConfig = signingConfigs.getByName("release")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

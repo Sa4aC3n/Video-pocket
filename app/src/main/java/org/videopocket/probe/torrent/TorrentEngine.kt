@@ -139,13 +139,6 @@ class TorrentEngine(private val context: Context) {
                 task.state = if (task.totalBytes <= 0) TorrentState.FETCHING_METADATA else TorrentState.CONNECTING
                 onUpdate(task)
 
-                val publicDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    ?: context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
-                    ?: context.filesDir
-
-                val targetDir = File(publicDownloads, "VideoPocket_Torrents").apply { if (!exists()) mkdirs() }
-                val targetFile = File(targetDir, sanitizeFilename(task.name))
-
                 // Query trackers to discover peers
                 task.state = TorrentState.CONNECTING
                 onUpdate(task)
@@ -153,46 +146,14 @@ class TorrentEngine(private val context: Context) {
                 val peers = queryTrackers(task)
                 task.peersCount = peers.size
                 task.seedsCount = (peers.size * 0.4).toInt()
-                onUpdate(task)
 
-                // Begin simulated piece downloading / peer streaming
-                task.state = TorrentState.DOWNLOADING
-                onUpdate(task)
-
-                val speedTracker = org.videopocket.probe.idm.SlidingSpeedTracker()
-                val totalToDownload = if (task.totalBytes > 0) task.totalBytes else 50L * 1024 * 1024 // Fallback size
-
-                while (!cancelled.get() && task.downloadedBytes < totalToDownload) {
-                    delay(300)
-                    val chunk = (32 * 1024..128 * 1024).random()
-                    task.downloadedBytes = (task.downloadedBytes + chunk).coerceAtMost(totalToDownload)
-                    speedTracker.add(chunk)
-                    task.downloadSpeedBps = speedTracker.speedBps()
-
-                    if (task.downloadSpeedBps > 0) {
-                        task.etaSeconds = (totalToDownload - task.downloadedBytes) / task.downloadSpeedBps
-                    }
-                    onUpdate(task)
-                }
-
-                if (cancelled.get()) {
-                    task.state = TorrentState.PAUSED
-                    task.downloadSpeedBps = 0
-                    task.uploadSpeedBps = 0
-                    onUpdate(task)
-                    return@launch
-                }
-
-                // Finalize target output
-                if (!targetFile.exists()) {
-                    targetFile.writeBytes(ByteArray(1024))
-                }
-                task.outputPath = targetFile.absolutePath
-                task.state = TorrentState.COMPLETED
+                // P2P piece streaming requires full libtorrent integration.
+                // Do not simulate fake downloads or write dummy files.
+                task.state = TorrentState.PAUSED
                 task.downloadSpeedBps = 0
-                task.etaSeconds = 0
+                task.uploadSpeedBps = 0
+                task.errorMessage = "Peers discovered (${peers.size}). P2P block exchange is under active development."
                 onUpdate(task)
-                onComplete(task, targetFile)
 
             } catch (e: CancellationException) {
                 task.state = TorrentState.PAUSED

@@ -34,7 +34,17 @@ object FileNamingEngine {
 object TempFileManager {
 
     fun cleanupTemporaryFiles(context: Context): Long {
-        return Workspaces.clean(context)
+        var freed = Workspaces.clean(context)
+        try {
+            val idmDir = File(context.filesDir, "idm_segments")
+            if (idmDir.exists()) {
+                val before = calculateDirSize(idmDir)
+                idmDir.deleteRecursively()
+                val after = calculateDirSize(idmDir)
+                freed += (before - after).coerceAtLeast(0L)
+            }
+        } catch (_: Exception) {}
+        return freed
     }
 
     fun getTempFilesSize(context: Context): Long {
@@ -43,6 +53,10 @@ object TempFileManager {
             val probeDir = File(context.noBackupFilesDir, "probe-files")
             if (probeDir.exists()) {
                 total += calculateDirSize(probeDir)
+            }
+            val idmDir = File(context.filesDir, "idm_segments")
+            if (idmDir.exists()) {
+                total += calculateDirSize(idmDir)
             }
         } catch (_: Exception) {}
         return total

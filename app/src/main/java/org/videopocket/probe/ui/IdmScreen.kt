@@ -1,5 +1,10 @@
 package org.videopocket.probe.ui
 
+import android.content.Intent
+import android.net.Uri
+import android.media.MediaScannerConnection
+import android.widget.Toast
+import java.io.File
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -260,7 +265,9 @@ fun IdmScreen(arabic: Boolean) {
                                             val idx = idmTasks.indexOfFirst { it.id == updated.id }
                                             if (idx >= 0) idmTasks[idx] = updated.copy()
                                         },
-                                        onComplete = { _, _ -> },
+                                        onComplete = { _, file ->
+                                            MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), null) { _, _ -> }
+                                        },
                                         onError = { _, _ -> }
                                     )
                                 },
@@ -339,7 +346,9 @@ fun IdmScreen(arabic: Boolean) {
                                 val idx = idmTasks.indexOfFirst { it.id == updated.id }
                                 if (idx >= 0) idmTasks[idx] = updated.copy()
                             },
-                            onComplete = { _, _ -> },
+                            onComplete = { _, file ->
+                                MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), null) { _, _ -> }
+                            },
                             onError = { _, _ -> }
                         )
                     },
@@ -482,6 +491,62 @@ fun IdmTaskCard(
                                     )
                             )
                         }
+                    }
+                }
+            }
+
+            if (task.state == IdmState.COMPLETED && !task.outputPath.isNullOrBlank()) {
+                val file = File(task.outputPath!!)
+                val context = LocalContext.current
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), null) { _, uri ->
+                                val targetUri = uri ?: Uri.fromFile(file)
+                                try {
+                                    val intent = Intent(Intent.ACTION_VIEW).apply {
+                                        setDataAndType(targetUri, "*/*")
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(intent)
+                                } catch (_: Exception) {
+                                    Toast.makeText(context, if (arabic) "تعذر فتح الملف؛ تحقق من وجود تطبيق مناسب" else "Unable to open file", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.OpenInNew, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(t("Open File", "فتح الملف"))
+                    }
+
+                    OutlinedButton(
+                        onClick = {
+                            MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), null) { _, uri ->
+                                val targetUri = uri ?: Uri.fromFile(file)
+                                try {
+                                    val intent = Intent(Intent.ACTION_SEND).apply {
+                                        type = "*/*"
+                                        putExtra(Intent.EXTRA_STREAM, targetUri)
+                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    }
+                                    context.startActivity(Intent.createChooser(intent, task.filename).apply {
+                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                    })
+                                } catch (_: Exception) {}
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(t("Share", "مشاركة"))
                     }
                 }
             }

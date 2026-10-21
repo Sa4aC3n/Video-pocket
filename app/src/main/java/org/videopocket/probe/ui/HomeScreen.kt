@@ -133,14 +133,24 @@ fun HomeScreen(
     }
 
     val pasteAction = {
-        try {
-            val clip = clipboardManager.getText()?.text?.toString()?.trim()
-            if (!clip.isNullOrBlank()) {
-                url = clip
-                urlValidationError = null
-                model.inspect(url, playlistMode)
+        if (!model.busy) {
+            try {
+                val clip = clipboardManager.getText()?.text?.toString()?.trim()
+                if (!clip.isNullOrBlank()) {
+                    url = clip
+                    if (clip.startsWith("http://", ignoreCase = true) || clip.startsWith("https://", ignoreCase = true)) {
+                        urlValidationError = null
+                        model.inspect(url, playlistMode)
+                    } else {
+                        urlValidationError = t("Clipboard text is not a valid web URL (must start with http:// or https://)", "النص المنسوخ ليس رابط ويب صالحًا (يجب أن يبدأ بـ http:// أو https://)")
+                    }
+                } else {
+                    urlValidationError = t("Clipboard is empty", "الحافظة فارغة")
+                }
+            } catch (_: Throwable) {
+                urlValidationError = t("Unable to read clipboard", "تعذر قراءة الحافظة")
             }
-        } catch (_: Throwable) {}
+        }
     }
 
     Column(
@@ -883,6 +893,10 @@ fun HomeScreen(
         BatchDownloadDialog(
             onDismiss = { showBatchDownload = false },
             queueManager = model.queueManager,
+            onNavigateDownloads = {
+                showBatchDownload = false
+                onNavigateDownloads()
+            },
             arabic = arabic
         )
     }

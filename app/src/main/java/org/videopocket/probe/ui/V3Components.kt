@@ -235,6 +235,7 @@ fun SupportedSourcesDialog(
 fun BatchDownloadDialog(
     onDismiss: () -> Unit,
     queueManager: DownloadQueueManager,
+    onNavigateDownloads: () -> Unit = {},
     arabic: Boolean
 ) {
     fun t(en: String, ar: String) = if (arabic) ar else en
@@ -292,12 +293,27 @@ fun BatchDownloadDialog(
                 )
 
                 if (isQueued) {
-                    Text(
-                        text = t("✓ Added to Download Queue!", "✓ تمت الإضافة إلى قائمة التنزيلات!"),
-                        color = Color(0xFF2E7D32),
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            text = t("✓ Added to Download Queue!", "✓ تمت الإضافة إلى قائمة التنزيلات!"),
+                            color = Color(0xFF2E7D32),
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Button(
+                            onClick = {
+                                onDismiss()
+                                onNavigateDownloads()
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp)
+                        ) {
+                            Icon(Icons.Default.DownloadDone, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(t("View in Downloads", "عرض في قائمة التنزيلات"))
+                        }
+                    }
                 }
 
                 Row(

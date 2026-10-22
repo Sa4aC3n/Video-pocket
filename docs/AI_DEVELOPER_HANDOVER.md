@@ -1,5 +1,5 @@
 # 🚀 Video Pocket — Master Project Handover & AI Continuity Guide
-> **Last Updated:** October 17, 2026 (v0.3.0 Release Candidate)  
+> **Last Updated:** October 2026 (v0.3.0)  
 > **Repository:** `https://github.com/Sa4aC3n/Video-pocket` (Public)  
 > **Target Platform:** Android 10+ (API 29–36)  
 > **Target Architecture:** arm64-v8a, x86_64  
@@ -37,14 +37,14 @@ graph TD
 
 ### Module & Source Directory Map (`app/src/main/java/org/videopocket/probe/`):
 - 📁 **`ui/`** (Modern Presentation Layer):
-  - `MainActivity.kt`: Root container, TopAppBar with 1-tap Theme toggle (☀️ Light / 🌙 Dark) and Language switcher (🇺🇸 EN / 🇪🇬 AR), bottom navigation bar connecting all engines.
+  - `MainActivity.kt`: Root container, TopAppBar with Settings gear icon, 1-tap Theme toggle (☀️ Light / 🌙 Dark) and Language switcher (🇺🇸 EN / 🇪🇬 AR), bottom navigation bar connecting all engines.
   - `VideoPocketTheme.kt`: Comprehensive Material 3 design system with vibrant Light mode and AMOLED Deep Navy Dark mode (`#0A0E1A`).
   - `HomeScreen.kt`: Multi-platform video downloader (YouTube, Facebook, TikTok, Instagram, Twitter/X, Reddit, etc.) with URL analyzer, format selector, and live progress.
   - `IdmScreen.kt`: Dedicated IDM section featuring direct URL inspection, parallel thread selector (1–16 segments), live segment block visualizer, category filtering, and speed meters.
   - `TorrentScreen.kt`: BitTorrent workstation with Magnet URI parser, `.torrent` file picker, active swarm dashboard (Seeds, Peers, Share Ratio), and upload/download meters.
   - `DownloadsScreen.kt`: Active queues, pause/resume/cancel controllers, and retry handlers.
   - `LibraryScreen.kt`: Categorized downloaded media browser with integrated preview and file share intents.
-  - `SettingsScreen.kt`: Compression presets, video quality ceilings, thread limits, and storage manager.
+  - `SettingsScreen.kt`: Compression presets, video quality ceilings, thread limits, storage manager, and native Google Play developer apps showcase.
 - 📁 **`idm/`** (Internet Download Manager Engine):
   - `IdmModels.kt`: `IdmTask`, `IdmSegment`, `IdmState`, `IdmCategory` (Video, Audio, Archive, Document, App, Other) with formatting helpers.
   - `IdmEngine.kt`: Multi-segment concurrent chunk downloader utilizing HTTP `Range: bytes=X-Y` requests, sliding-window speed calculation, and atomic segment reassembly.
@@ -65,7 +65,7 @@ graph TD
    - Downloads now utilize coroutine-based background dispatchers (`Dispatchers.IO`) managed within the app lifecycle.
 2. **Android App Bundle (`.aab`):**
    - Google Play Console strictly requires `.aab` (Android App Bundle) for new apps.
-   - Built via `./gradlew bundleRelease` with automatic release signing.
+   - Built via `./gradlew bundleRelease` for Google Play upload.
 
 ---
 
@@ -80,7 +80,6 @@ buildTypes {
     release {
         isMinifyEnabled = true
         isShrinkResources = true
-        signingConfig = signingConfigs.getByName("release")
         proguardFiles(
             getDefaultProguardFile("proguard-android-optimize.txt"),
             "proguard-rules.pro"
@@ -91,43 +90,26 @@ buildTypes {
 In `app/proguard-rules.pro`:
 - `-optimizationpasses 5`: Multi-round aggressive dead-code elimination.
 - `-allowaccessmodification`: Inlines and broadens access flags across packages.
-- `-mergeinterfacesaggressively`: Merges interfaces to minimize DEX method count.
 - Keep rules specifically tuned for:
   - Jetpack Compose runtime & compiler intrinsics
   - yt-dlp & FFmpeg JNI reflection bridges
   - Jackson JSON serialization models
   - IDM and Torrent data classes
-
-**Optimization Results:**
-- Debug APK: `172.1 MB`
-- Release APK: `135.8 MB` (~22% overall binary reduction including heavy native libs `libffmpeg.so` and `libpython.so`)
-- Release AAB: `130.3 MB` (Google Play serves dynamic splits, reducing per-user download to ~40–60 MB)
+  - Commons Compress & JNA wrappers
 
 ---
 
-## 🔑 5. Production Keystore & Signing Configuration
-The production release keystore is embedded in `app/videopocket-release.jks` and configured in `signingConfigs.release`:
-
-| Parameter | Value |
-|---|---|
-| **Keystore File** | `app/videopocket-release.jks` |
-| **Store Password** | `VideoPocket2026!` |
-| **Key Alias** | `videopocket` |
-| **Key Password** | `VideoPocket2026!` |
-| **Key Algorithm** | 2048-bit RSA with SHA256withRSA |
-| **Validity** | 10,000 days (Valid until March 2054) |
-| **Certificate Owner** | `CN=Video Pocket, OU=Mobile, O=VideoPocket, L=Cairo, ST=Cairo, C=EG` |
-| **SHA-256 Fingerprint** | `96:64:27:A2:C2:1F:30:33:83:2E:A9:05:0B:CB:F5:67:7C:5C:C8:07:80:92:34:01:15:E7:15:8A:F4:91:50:16` |
-
-> ⚠️ **CRITICAL FOR UPDATES:** Always sign future app versions with this exact keystore. Google Play will reject any update signed with a different key!
+## 🔑 5. Release Signing Configuration
+All hardcoded signing keys and passwords have been removed from the repository. The project builds clean, unsigned release artifacts (`app-release-unsigned.apk` and `app-release.aab`), allowing developers to:
+- Use **Google Play App Signing** (Google manages and signs the delivery keys automatically).
+- Or sign locally with an external private keystore when required using `apksigner` / `jarsigner`.
 
 ---
 
-## 📦 6. Local Artifacts in User Environment
-The latest release files are saved in `C:\Users\mohamed.keshka\Downloads\`:
-1. **`VideoPocket-v0.3.0-GooglePlay.aab`** (124.3 MB) — Production signed App Bundle for Google Play Console upload.
-2. **`VideoPocket-v0.3.0-release-signed.apk`** (129.5 MB) — Production signed APK for sideloading/direct testing.
-3. **`videopocket-release.jks`** (2.25 KB) — Standalone backup of the release keystore.
+## 📦 6. Local Artifacts & Releases
+Built release packages are placed in the `bin/` directory:
+1. `VideoPocket-release.aab` — Production App Bundle for Google Play Console upload.
+2. `VideoPocket-release.apk` — Release APK for direct installation/sideloading.
 
 ---
 
@@ -152,16 +134,12 @@ Please read `docs/AI_DEVELOPER_HANDOVER.md` in the repository as your primary re
 
 Key context:
 1. Tech Stack: Kotlin, Jetpack Compose, Material 3, Coroutines, yt-dlp + FFmpeg runtime.
-2. Architecture: Single-activity Compose app with 5 main sections:
-   - Videos (yt-dlp URL resolver & downloader)
-   - IDM (multi-segment HTTP Range chunk engine up to 16 threads)
-   - Torrent (magnet URI parser & swarm tracker)
-   - Queue / Downloads
-   - Library & Settings
-3. Google Play Compliance: No foreground services or restricted data sync permissions.
-4. Signing: Production keystore is in `app/videopocket-release.jks` (alias: videopocket).
-5. R8 full mode and ProGuard optimization passes are fully configured.
-6. The CI/CD pipeline builds both `assembleRelease` (.apk) and `bundleRelease` (.aab) automatically.
+2. Architecture: Single-activity Compose app with 6 core sections: Videos, IDM, Torrent, Queue, Pocket, Settings.
+3. Package ID: Permanently locked to `org.videopocket.probe`.
+4. Google Play Compliance: No foreground services or restricted data sync permissions.
+5. Signing: Keystore removed from code; uses standard unsigned release outputs / Google Play App Signing.
+6. R8 full mode and ProGuard optimization passes are fully configured.
+7. The CI/CD pipeline builds both `assembleRelease` (.apk) and `bundleRelease` (.aab) automatically.
 
 Please confirm you understand the architecture, then tell me what you'd recommend we work on next.
 ```

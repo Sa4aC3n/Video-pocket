@@ -400,6 +400,15 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                                     color = MaterialTheme.colorScheme.primary
                                 )
                             }
+
+                            // Quick Settings Navigation Icon
+                            IconButton(onClick = { selectedTab = 3 }) {
+                                Icon(
+                                    imageVector = Icons.Default.Settings,
+                                    contentDescription = t("Settings", "الإعدادات"),
+                                    tint = if (selectedTab == 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(
                             containerColor = MaterialTheme.colorScheme.background

@@ -1,5 +1,12 @@
 package org.videopocket.probe.ui
 
+import android.annotation.SuppressLint
+import android.content.Intent
+import android.net.Uri
+import android.webkit.WebChromeClient
+import android.webkit.WebSettings
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import android.widget.Toast
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -14,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import org.videopocket.probe.ProbeModel
 import org.videopocket.probe.core.AppSettings
 import org.videopocket.probe.core.DefaultQualityPreset
@@ -391,6 +399,9 @@ fun SettingsScreen(
             }
         }
 
+        // Google Play Developer Showcase (Inframe / WebView)
+        GooglePlayDeveloperCard(arabic = arabic)
+
         // About & Engine Section
         Card(
             shape = RoundedCornerShape(20.dp),
@@ -454,5 +465,181 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+}
+
+@SuppressLint("SetJavaScriptEnabled")
+@Composable
+fun GooglePlayDeveloperCard(arabic: Boolean) {
+    val context = LocalContext.current
+    fun t(en: String, ar: String) = if (arabic) ar else en
+
+    val devUrl = "https://play.google.com/store/apps/dev?id=6839550047456072292&hl=" + (if (arabic) "ar" else "en")
+    var isLoading by remember { mutableStateOf(true) }
+    var progress by remember { mutableFloatStateOf(0f) }
+
+    Card(
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // Header Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Surface(
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        modifier = Modifier.size(40.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Apps,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                                modifier = Modifier.size(24.dp)
+                            )
+                        }
+                    }
+                    Column {
+                        Text(
+                            text = t("Our Google Play Apps", "تطبيقاتنا على Google Play"),
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Text(
+                            text = t("Explore official releases & updates", "استكشف أحدث تطبيقاتنا وإصداراتنا"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                // External open in store button
+                FilledTonalIconButton(
+                    onClick = {
+                        runCatching {
+                            val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://dev?id=6839550047456072292"))
+                            marketIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(marketIntent)
+                        }.onFailure {
+                            val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse(devUrl))
+                            webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            context.startActivity(webIntent)
+                        }
+                    }
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.OpenInNew,
+                        contentDescription = t("Open in Google Play", "فتح في متجر Google Play")
+                    )
+                }
+            }
+
+            // Inframe WebView Container
+            Card(
+                shape = RoundedCornerShape(14.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(390.dp)
+            ) {
+                Box(modifier = Modifier.fillMaxSize()) {
+                    AndroidView(
+                        factory = { ctx ->
+                            WebView(ctx).apply {
+                                settings.apply {
+                                    javaScriptEnabled = true
+                                    domStorageEnabled = true
+                                    databaseEnabled = true
+                                    loadWithOverviewMode = true
+                                    useWideViewPort = true
+                                    cacheMode = WebSettings.LOAD_DEFAULT
+                                }
+                                webChromeClient = object : WebChromeClient() {
+                                    override fun onProgressChanged(view: WebView?, newProgress: Int) {
+                                        progress = newProgress / 100f
+                                        isLoading = newProgress < 100
+                                    }
+                                }
+                                webViewClient = object : WebViewClient() {
+                                    override fun shouldOverrideUrlLoading(view: WebView?, url: String?): Boolean {
+                                        if (url == null) return false
+                                        if (url.startsWith("market://") || url.contains("play.google.com/store/apps/details")) {
+                                            runCatching {
+                                                val intent = Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                                ctx.startActivity(intent)
+                                                return true
+                                            }
+                                        }
+                                        return false
+                                    }
+
+                                    override fun onPageFinished(view: WebView?, url: String?) {
+                                        super.onPageFinished(view, url)
+                                        isLoading = false
+                                    }
+                                }
+                                loadUrl(devUrl)
+                            }
+                        },
+                        update = { view ->
+                            val targetLangParam = "hl=" + (if (arabic) "ar" else "en")
+                            if (view.url?.contains("hl=") == true && !view.url!!.contains(targetLangParam)) {
+                                view.loadUrl(devUrl)
+                            }
+                        },
+                        onRelease = { view ->
+                            view.stopLoading()
+                            view.destroy()
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+
+                    // Loading progress indicator
+                    if (isLoading) {
+                        LinearProgressIndicator(
+                            progress = { progress },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .align(Alignment.TopCenter)
+                        )
+                    }
+                }
+            }
+
+            // Direct Store Link Button
+            OutlinedButton(
+                onClick = {
+                    runCatching {
+                        val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://dev?id=6839550047456072292"))
+                        marketIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(marketIntent)
+                    }.onFailure {
+                        val webIntent = Intent(Intent.ACTION_VIEW, Uri.parse(devUrl))
+                        webIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        context.startActivity(webIntent)
+                    }
+                },
+                shape = RoundedCornerShape(12.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Icon(Icons.Default.Apps, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(t("Open Developer Page in Google Play", "فتح صفحة المطور في متجر Google Play"))
+            }
+        }
     }
 }

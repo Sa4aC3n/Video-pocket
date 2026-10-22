@@ -70,7 +70,7 @@ fun TorrentScreen(arabic: Boolean) {
         verticalArrangement = Arrangement.spacedBy(14.dp),
         contentPadding = PaddingValues(top = 16.dp, bottom = 32.dp)
     ) {
-        // â”€â”€ Hero Section / Swarm Dashboard â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Hero Section / Swarm Dashboard ──────────────────────────────────
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -94,13 +94,13 @@ fun TorrentScreen(arabic: Boolean) {
                                 Icon(Icons.Default.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiary, modifier = Modifier.size(20.dp))
                             }
                             Text(
-                                text = t("BitTorrent Client", "Ù…Ø­Ø±Ùƒ Ø§Ù„ØªÙˆØ±Ù†Øª (uTorrent)"),
+                                text = t("BitTorrent Client", "محرك التورنت (uTorrent)"),
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Badge(containerColor = MaterialTheme.colorScheme.tertiary, contentColor = MaterialTheme.colorScheme.onTertiary) {
-                            Text(t("P2P Swarm", "Ø´Ø¨ÙƒØ© P2P"), modifier = Modifier.padding(4.dp), fontWeight = FontWeight.Bold)
+                            Text(t("P2P Swarm", "شبكة P2P"), modifier = Modifier.padding(4.dp), fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -110,12 +110,12 @@ fun TorrentScreen(arabic: Boolean) {
                         horizontalArrangement = Arrangement.SpaceAround
                     ) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(t("Download Speed", "Ø³Ø±Ø¹Ø© Ø§Ù„ØªÙ†Ø²ÙŠÙ„"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("â¬‡ ${TorrentTask.formatSpeed(totalDownSpeed)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                            Text(t("Download Speed", "سرعة التنزيل"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("↓ ${TorrentTask.formatSpeed(totalDownSpeed)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Text(t("Upload Speed", "Ø³Ø±Ø¹Ø© Ø§Ù„Ø±ÙØ¹"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                            Text("â¬† ${TorrentTask.formatSpeed(totalUpSpeed)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
+                            Text(t("Upload Speed", "سرعة الرفع"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            Text("↑ ${TorrentTask.formatSpeed(totalUpSpeed)}", fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.tertiary)
                         }
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(t("Torrents", "التورنتات"), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -153,7 +153,7 @@ fun TorrentScreen(arabic: Boolean) {
             }
         }
 
-        // â”€â”€ Input & File Opener Card â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Input & File Opener Card ──────────────────────────────────────────
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
@@ -165,7 +165,7 @@ fun TorrentScreen(arabic: Boolean) {
                     OutlinedTextField(
                         value = magnetInput,
                         onValueChange = { magnetInput = it },
-                        label = { Text(t("Magnet Link (magnet:?xt=...)", "Ø±Ø§Ø¨Ø· Ù…Ø§Ø¬Ù†Øª (magnet:?xt=...)")) },
+                        label = { Text(t("Magnet Link (magnet:?xt=...)", "رابط ماجنت (magnet:?xt=...)")) },
                         placeholder = { Text("magnet:?xt=urn:btih:...") },
                         singleLine = true,
                         shape = RoundedCornerShape(12.dp),
@@ -174,7 +174,7 @@ fun TorrentScreen(arabic: Boolean) {
                             IconButton(onClick = {
                                 clipboard.getText()?.text?.let { magnetInput = it.trim() }
                             }) {
-                                Icon(Icons.Default.ContentPaste, contentDescription = t("Paste", "Ù„ØµÙ‚"))
+                                Icon(Icons.Default.ContentPaste, contentDescription = t("Paste", "لصق"))
                             }
                         }
                     )
@@ -205,7 +205,7 @@ fun TorrentScreen(arabic: Boolean) {
                         ) {
                             Icon(Icons.Default.Download, contentDescription = null, Modifier.size(18.dp))
                             Spacer(Modifier.width(8.dp))
-                            Text(t("Download Magnet", "ØªØ­Ù…ÙŠÙ„ Ø§Ù„Ù…Ø§Ø¬Ù†Øª"))
+                            Text(t("Download Magnet", "تحميل الماجنت"))
                         }
 
                         OutlinedButton(
@@ -216,14 +216,14 @@ fun TorrentScreen(arabic: Boolean) {
                         ) {
                             Icon(Icons.Default.FolderOpen, contentDescription = null, Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text(t(".torrent File", "Ù…Ù„Ù ØªÙˆØ±Ù†Øª"))
+                            Text(t(".torrent File", "ملف تورنت"))
                         }
                     }
                 }
             }
         }
 
-        // â”€â”€ Torrents List â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+        // ── Torrents List ────────────────────────────────────────────────────
         if (torrentTasks.isEmpty()) {
             item {
                 Box(
@@ -233,12 +233,12 @@ fun TorrentScreen(arabic: Boolean) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Icon(Icons.Default.Share, contentDescription = null, modifier = Modifier.size(56.dp), tint = MaterialTheme.colorScheme.outline)
                         Text(
-                            text = t("No torrents added yet", "Ù„Ù… ÙŠØªÙ… Ø¥Ø¶Ø§ÙØ© Ø£ÙŠ ØªÙˆØ±Ù†Øª Ø¨Ø¹Ø¯"),
+                            text = t("No torrents added yet", "لم يتم إضافة أي تورنت بعد"),
                             style = MaterialTheme.typography.titleMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                         Text(
-                            text = t("Paste a magnet URI or open a .torrent file to download", "Ø§Ù„ØµÙ‚ Ø±Ø§Ø¨Ø· Ù…Ø§Ø¬Ù†Øª Ø£Ùˆ Ø§Ø®ØªØ± Ù…Ù„Ù .torrent Ù„Ø¨Ø¯Ø¡ Ø§Ù„ØªÙ†Ø²ÙŠÙ„ ÙˆØ§Ù„Ù…Ø´Ø§Ø±ÙƒØ©"),
+                            text = t("Paste a magnet URI or open a .torrent file to download", "الصق رابط ماجنت أو اختر ملف .torrent لبدء التنزيل والمشاركة"),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline
                         )

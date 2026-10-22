@@ -65,13 +65,24 @@
 -optimizationpasses 5
 
 # ── yt-dlp / youtubedl-android wrapper ───────────────────────────────────────
-# The wrapper uses reflection and JNI to communicate with the yt-dlp binary.
-# Aggressive shrinking can break these bridges.
+# The wrapper uses reflection, JNI, and Apache Commons Compress to unpack binaries.
+# Aggressive shrinking and interface merging break ZipUtils and ServiceLoader.
 
 -keep class com.yausername.** { *; }
+-keepclassmembers class com.yausername.** { *; }
 -keep class io.github.junkfood02.** { *; }
+-keepclassmembers class io.github.junkfood02.** { *; }
 -dontwarn com.yausername.**
 -dontwarn io.github.junkfood02.**
+
+# ── Apache Commons Compress (used by youtubedl-android ZipUtils) ───────────────
+-keep class org.apache.commons.compress.** { *; }
+-keepclassmembers class org.apache.commons.compress.** { *; }
+-dontwarn org.apache.commons.compress.**
+-keep class org.tukaani.xz.** { *; }
+-dontwarn org.tukaani.xz.**
+-keep class * implements org.apache.commons.compress.archivers.ArchiveStreamProvider { *; }
+-keep class * implements org.apache.commons.compress.compressors.CompressorStreamProvider { *; }
 
 # Keep JNI-accessible native method declarations
 -keepclasseswithmembernames class * {
@@ -118,13 +129,9 @@
 -dontwarn org.codehaus.mojo.**
 
 # ── R8 / DEX optimisation hints ───────────────────────────────────────────────
-# Allow R8 to inline and merge classes aggressively where it is safe.
-# The proguard-android-optimize.txt baseline already enables:
-#   -optimizations !code/simplification/arithmetic,...
-# We add our own to allow class merging across packages.
+# Allow R8 to inline where safe. Do NOT merge interfaces aggressively as this breaks ServiceLoader.
 
 -allowaccessmodification
--mergeinterfacesaggressively
 
 # ── Debugging: keep source file names and line numbers in stack traces ─────────
 -keepattributes SourceFile, LineNumberTable

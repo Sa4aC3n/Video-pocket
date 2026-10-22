@@ -62,7 +62,7 @@
 -keep class org.videopocket.probe.resolver.** { *; }
 -keep class org.videopocket.probe.engine.** { *; }
 
--optimizationpasses 5
+# R8 default passes (do not force multi-pass optimization in constrained CI/Cloud environments)
 
 # ── yt-dlp / youtubedl-android wrapper ───────────────────────────────────────
 # The wrapper uses reflection, JNI, and Apache Commons Compress to unpack binaries.

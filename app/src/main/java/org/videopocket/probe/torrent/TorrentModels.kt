@@ -38,7 +38,12 @@ data class TorrentTask(
     var files: List<TorrentFileEntry> = emptyList(),
     var outputPath: String? = null,
     val createdAtMs: Long = System.currentTimeMillis(),
-    var errorMessage: String? = null
+    var errorMessage: String? = null,
+    var pieceLength: Long = 0L,
+    var piecesHashes: ByteArray? = null,
+    var piecesCount: Int = 0,
+    var completedPieces: BooleanArray? = null,
+    var webSeeds: List<String> = emptyList()
 ) {
     val progressPercent: Float get() = if (totalBytes > 0) (downloadedBytes.toFloat() / totalBytes * 100f).coerceIn(0f, 100f) else 0f
 

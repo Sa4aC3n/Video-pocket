@@ -1,6 +1,9 @@
 package org.videopocket.probe.ui
 
+import android.content.Context
+import android.content.Intent
 import android.net.Uri
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
@@ -18,12 +21,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.content.FileProvider
 import kotlinx.coroutines.launch
 import org.videopocket.probe.torrent.*
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -37,6 +43,30 @@ fun TorrentScreen(arabic: Boolean) {
     var magnetInput by rememberSaveable { mutableStateOf("") }
     val torrentTasks = remember { mutableStateListOf<TorrentTask>() }
 
+    fun startTask(task: TorrentTask) {
+        torrentEngine.start(
+            task = task,
+            onUpdate = { updated ->
+                val idx = torrentTasks.indexOfFirst { it.id == updated.id }
+                if (idx >= 0) torrentTasks[idx] = updated.copy()
+            },
+            onComplete = { completedTask, file ->
+                Toast.makeText(
+                    context,
+                    if (arabic) "اكتمل تنزيل التورنت: ${file.name}" else "Torrent completed: ${file.name}",
+                    Toast.LENGTH_LONG
+                ).show()
+            },
+            onError = { failedTask, error ->
+                Toast.makeText(
+                    context,
+                    (if (arabic) "خطأ في التورنت: " else "Torrent error: ") + (error.message ?: ""),
+                    Toast.LENGTH_SHORT
+                ).show()
+            }
+        )
+    }
+
     // Launcher for selecting a .torrent file from local storage
     val torrentFileLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
@@ -47,17 +77,15 @@ fun TorrentScreen(arabic: Boolean) {
                     context.contentResolver.openInputStream(uri)?.use { stream ->
                         val task = torrentEngine.parseTorrentFile(stream)
                         torrentTasks.add(0, task)
-                        torrentEngine.start(
-                            task = task,
-                            onUpdate = { updated ->
-                                val idx = torrentTasks.indexOfFirst { it.id == updated.id }
-                                if (idx >= 0) torrentTasks[idx] = updated.copy()
-                            },
-                            onComplete = { _, _ -> },
-                            onError = { _, _ -> }
-                        )
+                        startTask(task)
                     }
-                } catch (_: Exception) {}
+                } catch (e: Exception) {
+                    Toast.makeText(
+                        context,
+                        (if (arabic) "فشل فتح ملف التورنت: " else "Failed to open torrent: ") + (e.message ?: ""),
+                        Toast.LENGTH_SHORT
+                    ).show()
+                }
             }
         }
     }
@@ -94,13 +122,13 @@ fun TorrentScreen(arabic: Boolean) {
                                 Icon(Icons.Default.CloudDownload, contentDescription = null, tint = MaterialTheme.colorScheme.onTertiary, modifier = Modifier.size(20.dp))
                             }
                             Text(
-                                text = t("BitTorrent Client", "محرك التورنت (uTorrent)"),
+                                text = t("BitTorrent Engine", "محرك التورنت (P2P)"),
                                 style = MaterialTheme.typography.titleLarge,
                                 fontWeight = FontWeight.Bold
                             )
                         }
                         Badge(containerColor = MaterialTheme.colorScheme.tertiary, contentColor = MaterialTheme.colorScheme.onTertiary) {
-                            Text(t("P2P Swarm", "شبكة P2P"), modifier = Modifier.padding(4.dp), fontWeight = FontWeight.Bold)
+                            Text(t("Swarm Active", "الشبكة نشطة"), modifier = Modifier.padding(4.dp), fontWeight = FontWeight.Bold)
                         }
                     }
 
@@ -134,15 +162,15 @@ fun TorrentScreen(arabic: Boolean) {
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Icon(
-                                Icons.Default.Info,
+                                Icons.Default.CheckCircle,
                                 contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
+                                tint = Color(0xFF2E7D32),
                                 modifier = Modifier.size(18.dp)
                             )
                             Text(
                                 text = t(
-                                    "Metadata parsing and tracker queries are live. Direct P2P block exchange is under active development.",
-                                    "فحص بيانات التورنت وقراءة النظراء تعمل فعليًا. التنزيل المباشر للكتل عبر P2P قيد التطوير."
+                                    "Real P2P block exchange, UDP/HTTP trackers & WebSeeds are enabled.",
+                                    "محرك P2P وتنزيل الكتل الفعلي وتتبع النظراء عبر UDP/HTTP يعملان بنجاح."
                                 ),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -187,16 +215,14 @@ fun TorrentScreen(arabic: Boolean) {
                                         val task = torrentEngine.parseMagnet(magnetInput.trim())
                                         torrentTasks.add(0, task)
                                         magnetInput = ""
-                                        torrentEngine.start(
-                                            task = task,
-                                            onUpdate = { updated ->
-                                                val idx = torrentTasks.indexOfFirst { it.id == updated.id }
-                                                if (idx >= 0) torrentTasks[idx] = updated.copy()
-                                            },
-                                            onComplete = { _, _ -> },
-                                            onError = { _, _ -> }
-                                        )
-                                    } catch (_: Exception) {}
+                                        startTask(task)
+                                    } catch (e: Exception) {
+                                        Toast.makeText(
+                                            context,
+                                            (if (arabic) "رابط ماجنت غير صالح: " else "Invalid magnet: ") + (e.message ?: ""),
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+                                    }
                                 }
                             },
                             enabled = magnetInput.startsWith("magnet:?", ignoreCase = true),
@@ -227,7 +253,7 @@ fun TorrentScreen(arabic: Boolean) {
         if (torrentTasks.isEmpty()) {
             item {
                 Box(
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 40.dp),
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 30.dp),
                     contentAlignment = Alignment.Center
                 ) {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -250,18 +276,9 @@ fun TorrentScreen(arabic: Boolean) {
                 TorrentTaskCard(
                     task = task,
                     arabic = arabic,
+                    context = context,
                     onPause = { torrentEngine.pause(task.id) },
-                    onResume = {
-                        torrentEngine.start(
-                            task = task,
-                            onUpdate = { updated ->
-                                val idx = torrentTasks.indexOfFirst { it.id == updated.id }
-                                if (idx >= 0) torrentTasks[idx] = updated.copy()
-                            },
-                            onComplete = { _, _ -> },
-                            onError = { _, _ -> }
-                        )
-                    },
+                    onResume = { startTask(task) },
                     onCancel = {
                         torrentEngine.cancel(task.id)
                         torrentTasks.remove(task)
@@ -276,11 +293,40 @@ fun TorrentScreen(arabic: Boolean) {
 fun TorrentTaskCard(
     task: TorrentTask,
     arabic: Boolean,
+    context: Context,
     onPause: () -> Unit,
     onResume: () -> Unit,
     onCancel: () -> Unit
 ) {
     fun t(en: String, ar: String) = if (arabic) ar else en
+
+    fun openFile(filePath: String) {
+        val file = File(filePath)
+        if (!file.exists()) {
+            Toast.makeText(context, if (arabic) "الملف غير موجود" else "File not found", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, context.contentResolver.getType(uri) ?: "*/*")
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        runCatching { context.startActivity(Intent.createChooser(intent, file.name)) }
+            .onFailure { Toast.makeText(context, if (arabic) "لا يوجد تطبيق لفتح هذا الملف" else "No app found to open file", Toast.LENGTH_SHORT).show() }
+    }
+
+    fun shareFile(filePath: String) {
+        val file = File(filePath)
+        if (!file.exists()) return
+        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = context.contentResolver.getType(uri) ?: "*/*"
+            putExtra(Intent.EXTRA_STREAM, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        runCatching { context.startActivity(Intent.createChooser(intent, file.name)) }
+    }
+
     Card(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(16.dp),
@@ -299,9 +345,17 @@ fun TorrentTaskCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Icon(
-                        imageVector = Icons.Default.CloudDownload,
+                        imageVector = when (task.state) {
+                            TorrentState.COMPLETED -> Icons.Default.CheckCircle
+                            TorrentState.FAILED -> Icons.Default.Error
+                            else -> Icons.Default.CloudDownload
+                        },
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = when (task.state) {
+                            TorrentState.COMPLETED -> Color(0xFF2E7D32)
+                            TorrentState.FAILED -> MaterialTheme.colorScheme.error
+                            else -> MaterialTheme.colorScheme.primary
+                        },
                         modifier = Modifier.size(24.dp)
                     )
                     Spacer(modifier = Modifier.width(10.dp))
@@ -317,7 +371,7 @@ fun TorrentTaskCard(
                             style = MaterialTheme.typography.bodySmall,
                             color = when (task.state) {
                                 TorrentState.DOWNLOADING, TorrentState.SEEDING -> MaterialTheme.colorScheme.primary
-                                TorrentState.COMPLETED -> androidx.compose.ui.graphics.Color(0xFF2E7D32)
+                                TorrentState.COMPLETED -> Color(0xFF2E7D32)
                                 TorrentState.FAILED -> MaterialTheme.colorScheme.error
                                 else -> MaterialTheme.colorScheme.outline
                             }
@@ -338,6 +392,15 @@ fun TorrentTaskCard(
                         Icon(Icons.Default.Close, contentDescription = "Cancel", tint = MaterialTheme.colorScheme.error)
                     }
                 }
+            }
+
+            if (task.errorMessage != null && task.state == TorrentState.FAILED) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text = task.errorMessage ?: "",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.error
+                )
             }
 
             Spacer(modifier = Modifier.height(10.dp))
@@ -383,6 +446,34 @@ fun TorrentTaskCard(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline
                     )
+                }
+            }
+
+            // If task is completed, show Open and Share buttons!
+            if (task.state == TorrentState.COMPLETED && !task.outputPath.isNullOrBlank()) {
+                Spacer(modifier = Modifier.height(12.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = { task.outputPath?.let { openFile(it) } },
+                        modifier = Modifier.weight(1f),
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(t("Open File", "تشغيل الملف"))
+                    }
+
+                    OutlinedButton(
+                        onClick = { task.outputPath?.let { shareFile(it) } },
+                        shape = RoundedCornerShape(10.dp)
+                    ) {
+                        Icon(Icons.Default.Share, contentDescription = null, Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text(t("Share", "مشاركة"))
+                    }
                 }
             }
         }

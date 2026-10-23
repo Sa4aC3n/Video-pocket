@@ -1,5 +1,6 @@
 package org.videopocket.probe.ui
 
+import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -26,6 +27,7 @@ import org.videopocket.probe.ProbeModel
 import org.videopocket.probe.core.*
 import org.videopocket.probe.download.DownloadState
 import org.videopocket.probe.download.DownloadTask
+import org.videopocket.probe.floating.FloatingBubbleManager
 import org.videopocket.probe.resolver.MediaType
 import org.videopocket.probe.resolver.ResolverErrorType
 import java.util.UUID
@@ -206,6 +208,30 @@ fun HomeScreen(
                 onClick = { showStorageManager = true },
                 label = { Text(t("Storage", "التخزين")) },
                 icon = { Icon(Icons.Default.Storage, contentDescription = null, modifier = Modifier.size(16.dp)) }
+            )
+            val isBubbleRunning = FloatingBubbleManager.isRunning
+            FilterChip(
+                selected = isBubbleRunning,
+                onClick = {
+                    if (isBubbleRunning) {
+                        FloatingBubbleManager.stop(context)
+                        AppSettings.setFloatingBubbleSetting(false)
+                    } else {
+                        if (FloatingBubbleManager.canDrawOverlays(context)) {
+                            FloatingBubbleManager.start(context)
+                            AppSettings.setFloatingBubbleSetting(true)
+                        } else {
+                            FloatingBubbleManager.requestOverlayPermission(context)
+                            Toast.makeText(
+                                context,
+                                t("Please allow 'Display over other apps'", "يرجى منح إذن 'الظهور فوق التطبيقات'"),
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        }
+                    }
+                },
+                label = { Text(if (isBubbleRunning) t("Bubble: ON", "الفقاعة: مفعّلة") else t("Floating Sniffer", "الفقاعة العائمة")) },
+                leadingIcon = { Icon(Icons.Default.CloudDownload, contentDescription = null, modifier = Modifier.size(16.dp)) }
             )
         }
 

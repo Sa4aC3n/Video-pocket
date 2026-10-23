@@ -15,8 +15,10 @@ import org.videopocket.probe.R
 object PocketNotifier {
     const val CHANNEL_ID = "videopocket_downloads"
     const val CHANNEL_ID_PROCESSING = "videopocket_processing"
+    const val CHANNEL_ID_BUBBLE = "videopocket_bubble"
     const val NOTIFICATION_ID_DOWNLOAD = 1001
     const val NOTIFICATION_ID_PROCESSING = 2001
+    const val NOTIFICATION_ID_BUBBLE = 3001
 
     private var lastNotificationTimeMs = 0L
     private var lastNotifiedPercent = -1
@@ -49,6 +51,41 @@ object PocketNotifier {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             notificationManager.createNotificationChannel(channel)
         }
+    }
+
+    fun initBubbleChannel(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val name = "VideoPocket Floating Sniffer"
+            val descriptionText = "Persistent notification while the floating video sniffer bubble is active"
+            val importance = NotificationManager.IMPORTANCE_LOW
+            val channel = NotificationChannel(CHANNEL_ID_BUBBLE, name, importance).apply {
+                description = descriptionText
+                enableLights(false)
+                enableVibration(false)
+            }
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.createNotificationChannel(channel)
+        }
+    }
+
+    fun buildBubbleNotification(context: Context): Notification {
+        initBubbleChannel(context)
+        val intent = Intent(context, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val pendingIntent = PendingIntent.getActivity(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Builder(context, CHANNEL_ID_BUBBLE)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setContentTitle("Video Pocket Sniffer")
+            .setContentText("Floating sniffer bubble is active. Tap to open app.")
+            .setOngoing(true)
+            .setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(pendingIntent)
+            .build()
     }
 
     /**

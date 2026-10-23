@@ -24,6 +24,7 @@ import org.videopocket.probe.ProbeModel
 import org.videopocket.probe.core.AppSettings
 import org.videopocket.probe.core.DefaultQualityPreset
 import org.videopocket.probe.core.ThemeMode
+import org.videopocket.probe.floating.FloatingBubbleManager
 import org.videopocket.probe.storage.StorageBreakdown
 import org.videopocket.probe.storage.StorageManager
 import kotlinx.coroutines.Dispatchers
@@ -313,6 +314,83 @@ fun SettingsScreen(
                     Switch(
                         checked = AppSettings.smartClipboardEnabled,
                         onCheckedChange = { AppSettings.setSmartClipboard(it) }
+                    )
+                }
+            }
+        }
+
+        // ── Floating Action Bubble (Quick Sniffer) ──────────────────────────
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(40.dp)
+                                .clip(androidx.compose.foundation.shape.CircleShape)
+                                .background(MaterialTheme.colorScheme.primaryContainer),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(
+                                Icons.Default.CloudDownload,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                        Column {
+                            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Text(
+                                    text = t("Floating Quick Sniffer", "فقاعة التنزيل السريع العائمة"),
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Badge(containerColor = MaterialTheme.colorScheme.primary) {
+                                    Text(t("Quick Win", "ميزة فورية"), modifier = Modifier.padding(2.dp))
+                                }
+                            }
+                            Text(
+                                text = t(
+                                    "Draggable floating bubble over all apps. Instantly capture, inspect, and download copied video links without switching apps.",
+                                    "فقاعة عائمة ذكية تظهر فوق كل التطبيقات لالتقاط الروابط المنسوخة وفحصها وتنزيلها بلمسة واحدة دون مغادرة تطبيقك."
+                                ),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.secondary
+                            )
+                        }
+                    }
+                    Switch(
+                        checked = FloatingBubbleManager.isRunning,
+                        onCheckedChange = { enable ->
+                            if (enable) {
+                                if (FloatingBubbleManager.canDrawOverlays(context)) {
+                                    FloatingBubbleManager.start(context)
+                                    AppSettings.setFloatingBubbleSetting(true)
+                                } else {
+                                    FloatingBubbleManager.requestOverlayPermission(context)
+                                    Toast.makeText(
+                                        context,
+                                        t("Please grant 'Display over other apps' permission", "يرجى منح إذن 'الظهور فوق التطبيقات الأخرى' لتفعيل الفقاعة"),
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            } else {
+                                FloatingBubbleManager.stop(context)
+                                AppSettings.setFloatingBubbleSetting(false)
+                            }
+                        }
                     )
                 }
             }

@@ -28,6 +28,7 @@ object AppSettings {
     private const val KEY_DEFAULT_FORMAT = "default_video_format"
     private const val KEY_DEFAULT_AUDIO_FORMAT = "default_audio_format"
     private const val KEY_CLIPBOARD_DETECTION = "smart_clipboard_detection"
+    private const val KEY_FLOATING_BUBBLE = "floating_bubble_enabled"
     private const val KEY_MAX_CONCURRENT = "max_concurrent_downloads"
 
     private lateinit var prefs: SharedPreferences
@@ -43,6 +44,8 @@ object AppSettings {
     var defaultAudioFormat by mutableStateOf("mp3")
         private set
     var smartClipboardEnabled by mutableStateOf(true)
+        private set
+    var floatingBubbleEnabled by mutableStateOf(false)
         private set
     var maxConcurrentDownloads by mutableIntStateOf(2)
         private set
@@ -62,6 +65,7 @@ object AppSettings {
             defaultVideoFormat = prefs.getString(KEY_DEFAULT_FORMAT, "mp4") ?: "mp4"
             defaultAudioFormat = prefs.getString(KEY_DEFAULT_AUDIO_FORMAT, "mp3") ?: "mp3"
             smartClipboardEnabled = prefs.getBoolean(KEY_CLIPBOARD_DETECTION, true)
+            floatingBubbleEnabled = prefs.getBoolean(KEY_FLOATING_BUBBLE, false)
             maxConcurrentDownloads = prefs.getInt(KEY_MAX_CONCURRENT, 2).coerceIn(1, 4)
         }
     }
@@ -105,6 +109,13 @@ object AppSettings {
         smartClipboardEnabled = enabled
         if (::prefs.isInitialized) {
             prefs.edit().putBoolean(KEY_CLIPBOARD_DETECTION, enabled).apply()
+        }
+    }
+
+    fun setFloatingBubbleSetting(enabled: Boolean) {
+        floatingBubbleEnabled = enabled
+        if (::prefs.isInitialized) {
+            prefs.edit().putBoolean(KEY_FLOATING_BUBBLE, enabled).apply()
         }
     }
 

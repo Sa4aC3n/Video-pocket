@@ -44,7 +44,7 @@ object FloatingBubbleManager {
     }
 
     /**
-     * Starts the FloatingBubbleService as a Foreground Service.
+     * Starts the FloatingBubbleService.
      */
     fun start(context: Context) {
         if (!canDrawOverlays(context)) {
@@ -52,11 +52,7 @@ object FloatingBubbleManager {
             return
         }
         val intent = Intent(context, FloatingBubbleService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(intent)
-        } else {
-            context.startService(intent)
-        }
+        context.startService(intent)
     }
 
     /**

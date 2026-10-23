@@ -64,24 +64,11 @@ class FloatingBubbleService : Service() {
         probeEngine = ProbeEngine(applicationContext)
         queueManager = DownloadQueueManager(applicationContext, probeEngine)
 
-        // 1. Start foreground with high-priority service notification
-        val notification = PocketNotifier.buildBubbleNotification(this)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                startForeground(
-                    PocketNotifier.NOTIFICATION_ID_BUBBLE,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
-                )
-            } else {
-                startForeground(
-                    PocketNotifier.NOTIFICATION_ID_BUBBLE,
-                    notification,
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC
-                )
-            }
-        } else {
-            startForeground(PocketNotifier.NOTIFICATION_ID_BUBBLE, notification)
+        // 1. Optional status notification
+        runCatching {
+            val notification = PocketNotifier.buildBubbleNotification(this)
+            val notifManager = getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager
+            notifManager.notify(PocketNotifier.NOTIFICATION_ID_BUBBLE, notification)
         }
 
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
@@ -530,6 +517,7 @@ class FloatingBubbleService : Service() {
         super.onDestroy()
         FloatingBubbleManager.isRunning = false
         scope.cancel()
+        runCatching { (getSystemService(NOTIFICATION_SERVICE) as android.app.NotificationManager).cancel(PocketNotifier.NOTIFICATION_ID_BUBBLE) }
         runCatching { bubbleView?.let { windowManager.removeView(it) } }
         runCatching { if (isExpanded) cardView?.let { windowManager.removeView(it) } }
     }

@@ -403,6 +403,15 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                                 )
                             }
 
+                            // Biometric Encrypted Vault Icon
+                            IconButton(onClick = { selectedTab = 7 }) {
+                                Icon(
+                                    imageVector = Icons.Default.Lock,
+                                    contentDescription = t("Vault", "الخزنة المشفرة"),
+                                    tint = if (selectedTab == 7) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
                             // Quick Settings Navigation Icon
                             IconButton(onClick = { selectedTab = 3 }) {
                                 Icon(
@@ -474,12 +483,14 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                                     model = model,
                                     arabic = arabic,
                                     onNavigateHome = { selectedTab = 0 },
+                                    onNavigateVault = { selectedTab = 7 },
                                     onProcess = {
                                         processingUri = it.uriString
                                         processingTitle = it.title
                                         selectedTab = 4
                                     }
                                 )
+                                7 -> VaultScreen(arabic = arabic, onNavigateBack = { selectedTab = 2 })
                                 4 -> ProcessingScreen(arabic = arabic, initialUri = processingUri, initialTitle = processingTitle)
                                 3 -> SettingsScreen(
                                     model = model,

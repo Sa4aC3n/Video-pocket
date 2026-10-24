@@ -6,6 +6,7 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
     <application
         android:label="@string/app_name"
@@ -53,6 +54,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <!-- Vault Content Provider for in-memory encrypted streaming playback -->
+        <provider
+            android:name=".vault.VaultContentProvider"
+            android:authorities="${applicationId}.vault"
+            android:exported="false"
+            android:grantUriPermissions="true" />
 
     </application>
 </manifest>

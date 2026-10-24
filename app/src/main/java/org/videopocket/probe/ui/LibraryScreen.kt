@@ -32,7 +32,13 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.ui.semantics.*
 
 @Composable
-fun LibraryScreen(model: ProbeModel, arabic: Boolean, onNavigateHome: () -> Unit, onProcess: (PocketLibraryItem) -> Unit) {
+fun LibraryScreen(
+    model: ProbeModel,
+    arabic: Boolean,
+    onNavigateHome: () -> Unit,
+    onNavigateVault: () -> Unit = {},
+    onProcess: (PocketLibraryItem) -> Unit
+) {
     val context = LocalContext.current
     fun t(en: String, ar: String) = if (arabic) ar else en
     var query by rememberSaveable { mutableStateOf("") }
@@ -62,6 +68,52 @@ fun LibraryScreen(model: ProbeModel, arabic: Boolean, onNavigateHome: () -> Unit
         }
         if (model.libraryError || model.libraryActionError) item {
             Text(t("Library action failed. Existing records have been kept. Check storage and file access.", "تعذرت عملية المكتبة مع الاحتفاظ بالسجلات الموجودة. راجع المساحة وصلاحية الوصول للملفات."), color = MaterialTheme.colorScheme.error)
+        }
+        item {
+            Card(
+                onClick = onNavigateVault,
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSecondary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = t("Encrypted Vault", "الخزنة المشفرة بالبصمة"),
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Text(
+                            text = t("AES-256-GCM hardware protection", "تشفير وحماية بنكية فائقة للملفات الحساسة"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
         }
         item {
             OutlinedTextField(query, { query = it }, label = { Text(t("Search title, format or collection", "البحث بالعنوان أو التنسيق أو المجموعة")) }, modifier = Modifier.fillMaxWidth(), singleLine = true)

@@ -193,7 +193,7 @@ fun TorrentScreen(arabic: Boolean) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = magnetInput,
-                        onValueChange = { magnetInput = it },
+                        onValueChange = { magnetInput = org.videopocket.probe.core.LinkPolicy.extractUrl(it) },
                         label = { Text(t("Magnet Link (magnet:?xt=...)", "رابط ماجنت (magnet:?xt=...)")) },
                         placeholder = { Text("magnet:?xt=urn:btih:...") },
                         singleLine = true,
@@ -201,7 +201,7 @@ fun TorrentScreen(arabic: Boolean) {
                         modifier = Modifier.fillMaxWidth(),
                         trailingIcon = {
                             IconButton(onClick = {
-                                clipboard.getText()?.text?.let { magnetInput = it.trim() }
+                                clipboard.getText()?.text?.let { magnetInput = org.videopocket.probe.core.LinkPolicy.extractUrl(it.toString()) }
                             }) {
                                 Icon(Icons.Default.ContentPaste, contentDescription = t("Paste", "لصق"))
                             }
@@ -211,9 +211,10 @@ fun TorrentScreen(arabic: Boolean) {
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
                         Button(
                             onClick = {
-                                if (magnetInput.isNotBlank()) {
+                                val cleanMagnet = org.videopocket.probe.core.LinkPolicy.extractUrl(magnetInput.trim())
+                                if (cleanMagnet.isNotBlank()) {
                                     try {
-                                        val task = torrentEngine.parseMagnet(magnetInput.trim())
+                                        val task = torrentEngine.parseMagnet(cleanMagnet)
                                         torrentTasks.add(0, task)
                                         magnetInput = ""
                                         startTask(task)

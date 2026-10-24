@@ -44,4 +44,33 @@ class PolicyTest {
         assertEquals("bestvideo[height<=720]+bestaudio/best[height<=720]/best", FormatPolicy.select(playlistInfo, ProbeAction.PLAYLIST_VIDEO, 720))
         assertEquals("bestaudio/best", FormatPolicy.select(playlistInfo, ProbeAction.PLAYLIST_MP3, 720))
     }
+
+    @Test
+    fun extractsUrlFromSoundCloudShareText() {
+        val soundCloudShare = "Listen to Amr Diab - Tamally Maak by Amr Diab on #SoundCloud https://on.soundcloud.com/xyz123"
+        assertEquals("https://on.soundcloud.com/xyz123", LinkPolicy.extractUrl(soundCloudShare))
+
+        val soundCloudFull = "Listen to Track by Artist on #SoundCloud\nhttps://soundcloud.com/artist/track?si=abcdef123456"
+        assertEquals("https://soundcloud.com/artist/track?si=abcdef123456", LinkPolicy.extractUrl(soundCloudFull))
+
+        val trailingText = "Check this track: https://soundcloud.com/user/track #music #trending"
+        assertEquals("https://soundcloud.com/user/track", LinkPolicy.extractUrl(trailingText))
+
+        val withPunctuation = "Listen here (https://on.soundcloud.com/abc)!"
+        assertEquals("https://on.soundcloud.com/abc", LinkPolicy.extractUrl(withPunctuation))
+    }
+
+    @Test
+    fun extractsMagnetFromShareText() {
+        val magnetShare = "Download this torrent: magnet:?xt=urn:btih:0123456789ABCDEF0123456789ABCDEF01234567&dn=Test"
+        assertEquals("magnet:?xt=urn:btih:0123456789ABCDEF0123456789ABCDEF01234567&dn=Test", LinkPolicy.extractUrl(magnetShare))
+    }
+
+    @Test
+    fun pureUrlRemainsUnchanged() {
+        val url = "https://soundcloud.com/artist/song"
+        assertEquals(url, LinkPolicy.extractUrl(url))
+        assertEquals("", LinkPolicy.extractUrl(null))
+        assertEquals("", LinkPolicy.extractUrl("   "))
+    }
 }

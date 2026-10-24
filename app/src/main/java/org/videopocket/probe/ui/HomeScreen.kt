@@ -71,12 +71,13 @@ fun HomeScreen(
         if (AppSettings.smartClipboardEnabled) {
             try {
                 val clipText = clipboardManager.getText()?.text?.toString()?.trim()
-                if (!clipText.isNullOrBlank() &&
-                    (clipText.startsWith("http://") || clipText.startsWith("https://")) &&
-                    clipText != url &&
-                    clipText != dismissedClipboardUrl
+                val extracted = LinkPolicy.extractUrl(clipText)
+                if (extracted.isNotBlank() &&
+                    (extracted.startsWith("http://", ignoreCase = true) || extracted.startsWith("https://", ignoreCase = true)) &&
+                    extracted != url &&
+                    extracted != dismissedClipboardUrl
                 ) {
-                    detectedClipboardUrl = clipText
+                    detectedClipboardUrl = extracted
                 }
             } catch (_: Throwable) {}
         }
@@ -92,7 +93,7 @@ fun HomeScreen(
     // Handle shared URL from Android share sheet
     LaunchedEffect(sharedIntent) {
         if (sharedIntent.isNotBlank()) {
-            url = sharedIntent.trim()
+            url = LinkPolicy.extractUrl(sharedIntent)
         }
     }
 
@@ -124,10 +125,14 @@ fun HomeScreen(
     }
 
     val performAnalyze = {
-        val trimmed = url.trim()
+        val extracted = LinkPolicy.extractUrl(url)
+        if (extracted != url && extracted.isNotBlank()) {
+            url = extracted
+        }
+        val trimmed = extracted.trim()
         if (trimmed.isBlank()) {
             urlValidationError = t("Please enter a link to analyze", "يرجى إدخال رابط للتحليل")
-        } else if (!trimmed.startsWith("http://") && !trimmed.startsWith("https://")) {
+        } else if (!trimmed.startsWith("http://", ignoreCase = true) && !trimmed.startsWith("https://", ignoreCase = true)) {
             urlValidationError = t("Link must start with http:// or https://", "يجب أن يبدأ الرابط بـ http:// أو https://")
         } else {
             urlValidationError = null
@@ -139,9 +144,10 @@ fun HomeScreen(
         if (!model.busy) {
             try {
                 val clip = clipboardManager.getText()?.text?.toString()?.trim()
-                if (!clip.isNullOrBlank()) {
-                    url = clip
-                    if (clip.startsWith("http://", ignoreCase = true) || clip.startsWith("https://", ignoreCase = true)) {
+                val extracted = LinkPolicy.extractUrl(clip)
+                if (extracted.isNotBlank()) {
+                    url = extracted
+                    if (extracted.startsWith("http://", ignoreCase = true) || extracted.startsWith("https://", ignoreCase = true)) {
                         urlValidationError = null
                         model.inspect(url, playlistMode)
                     } else {
@@ -307,8 +313,8 @@ fun HomeScreen(
 
                 OutlinedTextField(
                     value = url,
-                    onValueChange = {
-                        url = it
+                    onValueChange = { input ->
+                        url = LinkPolicy.extractUrl(input)
                         urlValidationError = null
                     },
                     enabled = !model.busy,

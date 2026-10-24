@@ -1,4 +1,4 @@
-﻿package org.videopocket.probe.core
+package org.videopocket.probe.core
 
 import java.net.URI
 
@@ -139,6 +139,32 @@ data class PocketLibraryItem(
 )
 
 object LinkPolicy {
+    private val URL_REGEX = Regex("""https?://[^\s<>"'{}|\\^`]+""", RegexOption.IGNORE_CASE)
+    private val MAGNET_REGEX = Regex("""magnet:\?[^\s<>"'{}|\\^`]+""", RegexOption.IGNORE_CASE)
+
+    /**
+     * Extracts the first valid HTTP/HTTPS or Magnet URL from any text snippet,
+     * stripping prefixes (such as SoundCloud titles, hashtags, or social share captions)
+     * and trailing punctuation.
+     * If no URL is found, returns the trimmed original input.
+     */
+    fun extractUrl(input: String?): String {
+        if (input.isNullOrBlank()) return ""
+        val trimmed = input.trim()
+
+        val magnetMatch = MAGNET_REGEX.find(trimmed)
+        if (magnetMatch != null) {
+            return magnetMatch.value.trimEnd('.', ',', ';', '!', '?', ')')
+        }
+
+        val urlMatch = URL_REGEX.find(trimmed)
+        if (urlMatch != null) {
+            return urlMatch.value.trimEnd('.', ',', ';', '!', '?', ')')
+        }
+
+        return trimmed
+    }
+
     fun validate(input: String): String {
         val text = input.trim()
         val uri = try { URI(text) } catch (_: Exception) { throw ProbeFailure(Problem.INVALID_URL) }

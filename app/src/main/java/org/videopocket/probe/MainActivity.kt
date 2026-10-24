@@ -1,4 +1,4 @@
-﻿package org.videopocket.probe
+package org.videopocket.probe
 
 import android.app.Application
 import android.content.Intent
@@ -49,7 +49,9 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        sharedText = if (intent.action == Intent.ACTION_SEND) intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty() else ""
+        sharedText = if (intent.action == Intent.ACTION_SEND) {
+            LinkPolicy.extractUrl(intent.getStringExtra(Intent.EXTRA_TEXT))
+        } else ""
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -59,7 +61,7 @@ class MainActivity : ComponentActivity() {
         FeatureFlagsManager.init(this)
 
         sharedText = if (intent?.action == Intent.ACTION_SEND) {
-            intent.getStringExtra(Intent.EXTRA_TEXT).orEmpty()
+            LinkPolicy.extractUrl(intent.getStringExtra(Intent.EXTRA_TEXT))
         } else {
             ""
         }

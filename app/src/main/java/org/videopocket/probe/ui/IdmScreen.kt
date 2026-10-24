@@ -122,7 +122,7 @@ fun IdmScreen(arabic: Boolean) {
                 Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     OutlinedTextField(
                         value = idmUrlInput,
-                        onValueChange = { idmUrlInput = it },
+                        onValueChange = { idmUrlInput = org.videopocket.probe.core.LinkPolicy.extractUrl(it) },
                         label = { Text(t("Direct Download URL (HTTP / HTTPS)", "رابط مباشر للتحميل (HTTP / HTTPS)")) },
                         placeholder = { Text("https://example.com/file.zip") },
                         singleLine = true,
@@ -130,7 +130,7 @@ fun IdmScreen(arabic: Boolean) {
                         modifier = Modifier.fillMaxWidth(),
                         trailingIcon = {
                             IconButton(onClick = {
-                                clipboard.getText()?.text?.let { idmUrlInput = it.trim() }
+                                clipboard.getText()?.text?.let { idmUrlInput = org.videopocket.probe.core.LinkPolicy.extractUrl(it.toString()) }
                             }) {
                                 Icon(Icons.Default.ContentPaste, contentDescription = t("Paste", "لصق"))
                             }
@@ -144,7 +144,8 @@ fun IdmScreen(arabic: Boolean) {
                                     idmInspecting = true
                                     scope.launch {
                                         try {
-                                            val task = idmEngine.inspect(idmUrlInput.trim())
+                                            val cleanUrl = org.videopocket.probe.core.LinkPolicy.extractUrl(idmUrlInput.trim())
+                                            val task = idmEngine.inspect(cleanUrl)
                                             idmInspectedTask = task
                                         } catch (_: Exception) {}
                                         finally { idmInspecting = false }

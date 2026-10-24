@@ -1,4 +1,4 @@
-﻿package org.videopocket.probe.floating
+package org.videopocket.probe.floating
 
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
@@ -380,7 +380,7 @@ class FloatingBubbleService : Service() {
             background = b
             layoutParams = LinearLayout.LayoutParams(0, dpToPx(40), 1f).apply { marginEnd = dpToPx(4) }
             setOnClickListener {
-                val url = urlEditText.text.toString().trim()
+                val url = org.videopocket.probe.core.LinkPolicy.extractUrl(urlEditText.text.toString())
                 if (isValidUrl(url)) {
                     enqueueDownload(url, isAudio = false)
                     Toast.makeText(this@FloatingBubbleService, t("Download added to queue!", "تمت إضافة التنزيل للمكتبة!"), Toast.LENGTH_SHORT).show()
@@ -404,7 +404,7 @@ class FloatingBubbleService : Service() {
             background = b
             layoutParams = LinearLayout.LayoutParams(0, dpToPx(40), 1f).apply { marginStart = dpToPx(4); marginEnd = dpToPx(4) }
             setOnClickListener {
-                val url = urlEditText.text.toString().trim()
+                val url = org.videopocket.probe.core.LinkPolicy.extractUrl(urlEditText.text.toString())
                 if (isValidUrl(url)) {
                     enqueueDownload(url, isAudio = true)
                     Toast.makeText(this@FloatingBubbleService, t("MP3 Audio added to queue!", "تمت إضافة الصوت للمكتبة!"), Toast.LENGTH_SHORT).show()
@@ -428,7 +428,7 @@ class FloatingBubbleService : Service() {
             background = b
             layoutParams = LinearLayout.LayoutParams(0, dpToPx(40), 0.9f).apply { marginStart = dpToPx(4) }
             setOnClickListener {
-                val url = urlEditText.text.toString().trim()
+                val url = org.videopocket.probe.core.LinkPolicy.extractUrl(urlEditText.text.toString())
                 val intent = Intent(this@FloatingBubbleService, MainActivity::class.java).apply {
                     action = Intent.ACTION_SEND
                     putExtra(Intent.EXTRA_TEXT, url)
@@ -494,13 +494,14 @@ class FloatingBubbleService : Service() {
         // 1. Check clipboard for quick video URL auto-fill
         val clip = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
         val clipText = clip.primaryClip?.getItemAt(0)?.text?.toString()?.trim().orEmpty()
+        val cleanUrl = org.videopocket.probe.core.LinkPolicy.extractUrl(clipText)
 
         cardView?.let { card ->
             val input = ((card as? ViewGroup)?.getChildAt(1) as? ViewGroup)?.getChildAt(0) as? EditText
             val status = card.getChildAt(2) as? TextView
 
-            if (isValidUrl(clipText)) {
-                input?.setText(clipText)
+            if (isValidUrl(cleanUrl)) {
+                input?.setText(cleanUrl)
                 status?.text = if (AppSettings.isArabic) "🔗 تم التقاط رابط تلقائيًا من الحافظة" else "🔗 Link auto-detected from clipboard"
                 status?.visibility = View.VISIBLE
             } else {

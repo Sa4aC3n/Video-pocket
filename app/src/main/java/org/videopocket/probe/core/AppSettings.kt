@@ -1,4 +1,4 @@
-﻿package org.videopocket.probe.core
+package org.videopocket.probe.core
 
 import android.content.Context
 import android.content.SharedPreferences
@@ -30,6 +30,8 @@ object AppSettings {
     private const val KEY_CLIPBOARD_DETECTION = "smart_clipboard_detection"
     private const val KEY_FLOATING_BUBBLE = "floating_bubble_enabled"
     private const val KEY_MAX_CONCURRENT = "max_concurrent_downloads"
+    private const val KEY_SPONSOR_BLOCK = "sponsor_block_enabled"
+    private const val KEY_SPONSOR_BLOCK_REMOVE_DOWNLOAD = "sponsor_block_remove_download"
 
     private lateinit var prefs: SharedPreferences
 
@@ -49,6 +51,10 @@ object AppSettings {
         private set
     var maxConcurrentDownloads by mutableIntStateOf(2)
         private set
+    var sponsorBlockEnabled by mutableStateOf(true)
+        private set
+    var sponsorBlockRemoveOnDownload by mutableStateOf(false)
+        private set
 
     fun init(context: Context) {
         if (!::prefs.isInitialized) {
@@ -67,6 +73,8 @@ object AppSettings {
             smartClipboardEnabled = prefs.getBoolean(KEY_CLIPBOARD_DETECTION, true)
             floatingBubbleEnabled = prefs.getBoolean(KEY_FLOATING_BUBBLE, false)
             maxConcurrentDownloads = prefs.getInt(KEY_MAX_CONCURRENT, 2).coerceIn(1, 4)
+            sponsorBlockEnabled = prefs.getBoolean(KEY_SPONSOR_BLOCK, true)
+            sponsorBlockRemoveOnDownload = prefs.getBoolean(KEY_SPONSOR_BLOCK_REMOVE_DOWNLOAD, false)
         }
     }
 
@@ -123,6 +131,20 @@ object AppSettings {
         maxConcurrentDownloads = count.coerceIn(1, 4)
         if (::prefs.isInitialized) {
             prefs.edit().putInt(KEY_MAX_CONCURRENT, maxConcurrentDownloads).apply()
+        }
+    }
+
+    fun setSponsorBlock(enabled: Boolean) {
+        sponsorBlockEnabled = enabled
+        if (::prefs.isInitialized) {
+            prefs.edit().putBoolean(KEY_SPONSOR_BLOCK, enabled).apply()
+        }
+    }
+
+    fun setSponsorBlockRemoveOnDownload(enabled: Boolean) {
+        sponsorBlockRemoveOnDownload = enabled
+        if (::prefs.isInitialized) {
+            prefs.edit().putBoolean(KEY_SPONSOR_BLOCK_REMOVE_DOWNLOAD, enabled).apply()
         }
     }
 }

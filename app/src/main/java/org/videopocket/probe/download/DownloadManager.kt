@@ -1,4 +1,4 @@
-﻿package org.videopocket.probe.download
+package org.videopocket.probe.download
 
 import android.app.Application
 import android.content.Context
@@ -69,7 +69,8 @@ data class DownloadTask(
     val canPause: Boolean = false,
     val canResume: Boolean = false,
     val elapsedMs: Long? = null,
-    val validationDetail: String? = null
+    val validationDetail: String? = null,
+    val removeSponsors: Boolean = false
 )
 
 /**
@@ -303,7 +304,8 @@ class DownloadQueueManager(
                         if (task.height < 0) media.heights.maxOrNull() ?: 0 else task.height,
                         task.bitrate,
                         if (task.isAudioOnly) "auto" else task.format,
-                        progress
+                        progress,
+                        removeSponsors = task.removeSponsors
                     )
                 }
                 check(downloaded.passed && !downloaded.outputUri.isNullOrBlank())

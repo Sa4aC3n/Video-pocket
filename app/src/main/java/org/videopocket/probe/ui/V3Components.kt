@@ -1,4 +1,4 @@
-﻿package org.videopocket.probe.ui
+package org.videopocket.probe.ui
 
 import android.content.Context
 import android.media.MediaPlayer
@@ -38,6 +38,7 @@ import org.videopocket.probe.core.ClipRequest
 import org.videopocket.probe.core.PocketLibraryItem
 import org.videopocket.probe.core.AppSettings
 import org.videopocket.probe.core.PocketLibraryManager
+import org.videopocket.probe.sponsorblock.*
 import org.videopocket.probe.download.DownloadQueueManager
 import org.videopocket.probe.download.DownloadState
 import org.videopocket.probe.download.DownloadTask
@@ -613,6 +614,46 @@ fun BuiltInPlayerDialog(
     var videoViewRef by remember { mutableStateOf<VideoView?>(null) }
     var mediaPlayerRef by remember { mutableStateOf<MediaPlayer?>(null) }
 
+    val sponsorSegments = remember { mutableStateListOf<SponsorSegment>() }
+    var autoSkipSponsors by remember { mutableStateOf(AppSettings.sponsorBlockEnabled) }
+    var skippedBannerText by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(item) {
+        val candidateId = item.sourceMediaId ?: SponsorBlockClient.extractVideoId(item.sourceUrl ?: item.title)
+        if (candidateId != null) {
+            val list = SponsorBlockClient.getSegments(candidateId)
+            sponsorSegments.clear()
+            sponsorSegments.addAll(list)
+        }
+    }
+
+    LaunchedEffect(isPlaying, autoSkipSponsors, sponsorSegments.size) {
+        if (!autoSkipSponsors || sponsorSegments.isEmpty()) return@LaunchedEffect
+        while (isPlaying) {
+            delay(400)
+            videoViewRef?.let { vv ->
+                if (vv.isPlaying) {
+                    val currentSec = vv.currentPosition / 1000.0
+                    val seg = SponsorSegment.findSegmentToSkip(currentSec, sponsorSegments)
+                    if (seg != null) {
+                        val skipToMs = (seg.end * 1000).toInt() + 150
+                        vv.seekTo(skipToMs)
+                        val catLabel = SponsorSegment.categoryLabel(seg.category, arabic)
+                        val range = "${ClipRequest.formatSeconds(seg.start)} → ${ClipRequest.formatSeconds(seg.end)}"
+                        skippedBannerText = if (arabic) "⏭️ تم تخطي $catLabel ($range)" else "⏭️ Skipped $catLabel ($range)"
+                    }
+                }
+            }
+        }
+    }
+
+    LaunchedEffect(skippedBannerText) {
+        if (skippedBannerText != null) {
+            delay(3500)
+            skippedBannerText = null
+        }
+    }
+
     Dialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(usePlatformDefaultWidth = false)
@@ -665,6 +706,23 @@ fun BuiltInPlayerDialog(
                         },
                         modifier = Modifier.fillMaxSize()
                     )
+
+                    if (skippedBannerText != null) {
+                        Card(
+                            modifier = Modifier.align(Alignment.TopCenter).padding(top = 16.dp),
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(containerColor = Color(0xCC0F172A))
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(Icons.Default.FastForward, contentDescription = null, tint = Color(0xFF38BDF8), modifier = Modifier.size(18.dp))
+                                Text(skippedBannerText!!, color = Color.White, style = MaterialTheme.typography.bodySmall, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
                 }
 
                 // Controls
@@ -672,6 +730,37 @@ fun BuiltInPlayerDialog(
                     modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
+                    if (sponsorSegments.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            FilterChip(
+                                selected = autoSkipSponsors,
+                                onClick = { autoSkipSponsors = !autoSkipSponsors },
+                                leadingIcon = {
+                                    Icon(
+                                        imageVector = if (autoSkipSponsors) Icons.Default.FastForward else Icons.Default.Block,
+                                        contentDescription = null,
+                                        tint = if (autoSkipSponsors) Color(0xFF38BDF8) else Color.LightGray,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        if (arabic) "تخطي الرعايات تلقائياً (${sponsorSegments.size})" else "SponsorBlock (${sponsorSegments.size} segments)",
+                                        color = if (autoSkipSponsors) Color.White else Color.LightGray,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (autoSkipSponsors) FontWeight.Bold else FontWeight.Normal
+                                    )
+                                },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = Color(0xFF1E293B),
+                                    containerColor = Color(0xFF1E1E1E)
+                                )
+                            )
+                        }
+                    }
                     // Playback speed chips
                     Row(
                         modifier = Modifier.fillMaxWidth(),

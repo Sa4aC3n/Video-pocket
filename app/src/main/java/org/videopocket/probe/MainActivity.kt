@@ -266,7 +266,13 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun run(action: ProbeAction, height: Int, bitrate: Int, outputFormat: String = AppSettings.defaultVideoFormat) {
+    fun run(
+        action: ProbeAction,
+        height: Int,
+        bitrate: Int,
+        outputFormat: String = AppSettings.defaultVideoFormat,
+        removeSponsors: Boolean = AppSettings.sponsorBlockRemoveOnDownload
+    ) {
         if (busy) return
         val media = info ?: return
         val url = inspectedUrl ?: return
@@ -274,7 +280,8 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
         queueManager.enqueue(DownloadTask(url = url, title = media.title,
             platform = normalizedMetadata?.platform ?: media.extractor.orEmpty(),
             quality = if (audio) "${bitrate} kbps output" else if (height > 0) "${height}p" else "Source quality",
-            format = if (audio) "mp3" else outputFormat, height = height, bitrate = bitrate, isAudioOnly = audio, rawInfo = media))
+            format = if (audio) "mp3" else outputFormat, height = height, bitrate = bitrate, isAudioOnly = audio, rawInfo = media,
+            removeSponsors = removeSponsors))
     }
 
     fun runClip(clip: ClipRequest) {

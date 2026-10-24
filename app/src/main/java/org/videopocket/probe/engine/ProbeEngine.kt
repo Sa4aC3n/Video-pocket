@@ -275,16 +275,16 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
     }
 
     override fun download(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, progress: (Float) -> Unit): ProbeResult =
-        downloadWithFormat(url, info, action, height, bitrate, "auto", progress)
+        downloadWithFormat(url, info, action, height, bitrate, "auto", progress, false)
 
-    fun downloadWithFormat(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, outputFormat: String, progress: (Float) -> Unit): ProbeResult {
+    fun downloadWithFormat(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, outputFormat: String, progress: (Float) -> Unit, removeSponsors: Boolean = false): ProbeResult {
         require(outputFormat in setOf("auto", "mp4", "mkv", "webm"))
         initialize()
         require(action != ProbeAction.INSPECT)
         require(bitrate in setOf(128, 192, 320))
         val isPlaylist = info.isPlaylist || action == ProbeAction.PLAYLIST_VIDEO || action == ProbeAction.PLAYLIST_MP3
         if (isPlaylist) {
-            return downloadPlaylist(url, info, action, height, bitrate, outputFormat, progress)
+            return downloadPlaylist(url, info, action, height, bitrate, outputFormat, progress, removeSponsors)
         }
         val format = FormatPolicy.select(info, action, height)
         val estimate = info.formats.filter { it.id in format.split('+') }.mapNotNull { it.bytes }.sum()
@@ -307,6 +307,10 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 .addOption("--embed-metadata")
                 .addOption("--embed-thumbnail")
                 .addOption("--convert-thumbnails", "jpg")
+
+            if (removeSponsors) {
+                req.addOption("--sponsorblock-remove", "sponsor,selfpromo,interaction")
+            }
 
             checkCancelled()
             withResourceGuard(id) {
@@ -429,7 +433,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         }
     }
 
-    private fun downloadPlaylist(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, outputFormat: String, progress: (Float) -> Unit): ProbeResult {
+    private fun downloadPlaylist(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, outputFormat: String, progress: (Float) -> Unit, removeSponsors: Boolean = false): ProbeResult {
         if (StatFs(context.noBackupFilesDir.path).availableBytes < 512L * 1024 * 1024)
             throw ProbeFailure(Problem.SPACE)
         val id = UUID.randomUUID().toString()
@@ -442,6 +446,10 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 .addOption("--newline")
                 .addOption("--output", File(folder, "%(playlist_index)05d-%(title).80s.%(ext)s").absolutePath)
                 .addOption("--max-filesize", "512M")
+
+            if (removeSponsors) {
+                req.addOption("--sponsorblock-remove", "sponsor,selfpromo,interaction")
+            }
 
             if (action == ProbeAction.MP3 || action == ProbeAction.PLAYLIST_MP3) {
                 req.addOption("-x")

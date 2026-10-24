@@ -30,6 +30,7 @@ import org.videopocket.probe.download.DownloadTask
 import org.videopocket.probe.floating.FloatingBubbleManager
 import org.videopocket.probe.resolver.MediaType
 import org.videopocket.probe.resolver.ResolverErrorType
+import org.videopocket.probe.sponsorblock.*
 import java.util.UUID
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -65,6 +66,8 @@ fun HomeScreen(
     var detectedClipboardUrl by remember { mutableStateOf<String?>(null) }
     var dismissedClipboardUrl by remember { mutableStateOf<String?>(null) }
     var urlValidationError by remember { mutableStateOf<String?>(null) }
+    val sponsorSegments = remember { mutableStateListOf<SponsorSegment>() }
+    var cleanDownloadWithoutSponsors by rememberSaveable { mutableStateOf(AppSettings.sponsorBlockRemoveOnDownload) }
 
     // Privacy-conscious smart clipboard detection on view
     LaunchedEffect(Unit) {
@@ -97,9 +100,15 @@ fun HomeScreen(
         }
     }
 
-    // Update height when media is inspected
+    // Update height and check SponsorBlock when media is inspected
     LaunchedEffect(model.info) {
+        sponsorSegments.clear()
         model.info?.let {
+            val vidId = it.id ?: SponsorBlockClient.extractVideoId(model.inspectedUrl)
+            if (vidId != null) {
+                val list = SponsorBlockClient.getSegments(vidId)
+                sponsorSegments.addAll(list)
+            }
             selectedHeight = when (AppSettings.defaultQuality) {
                 DefaultQualityPreset.BEST_AVAILABLE -> it.heights.maxOrNull() ?: it.defaultHeight
                 DefaultQualityPreset.BALANCED -> it.heights.firstOrNull { h -> h in 720..1080 } ?: it.defaultHeight
@@ -567,6 +576,32 @@ fun HomeScreen(
                                         }
                                     }
                                 }
+
+                                if (sponsorSegments.isNotEmpty()) {
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = Color(0xFF0284C7).copy(alpha = 0.15f)
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.FastForward,
+                                                contentDescription = null,
+                                                tint = Color(0xFF0284C7),
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(Modifier.width(4.dp))
+                                            Text(
+                                                text = if (arabic) "${sponsorSegments.size} إعلانات" else "${sponsorSegments.size} sponsors",
+                                                color = Color(0xFF0284C7),
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold
+                                            )
+                                        }
+                                    }
+                                }
                             }
 
                             Spacer(Modifier.height(4.dp))
@@ -597,7 +632,7 @@ fun HomeScreen(
                             onClick = {
                                 triggerDownloadWithDuplicateCheck {
                                     val action = if (media.isPlaylist) ProbeAction.PLAYLIST_VIDEO else ProbeAction.VIDEO
-                                    model.run(action, selectedHeight, selectedBitrate, videoFormat)
+                                    model.run(action, selectedHeight, selectedBitrate, videoFormat, removeSponsors = cleanDownloadWithoutSponsors)
                                 }
                             },
                             enabled = !model.busy,
@@ -698,10 +733,40 @@ fun HomeScreen(
                                     }
                                 }
 
+                                if (sponsorSegments.isNotEmpty()) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { cleanDownloadWithoutSponsors = !cleanDownloadWithoutSponsors },
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Icon(Icons.Default.ContentCut, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                            Column {
+                                                Text(
+                                                    t("Cut Sponsors (${sponsorSegments.size} detected)", "قص الرعايات (${sponsorSegments.size} تم رصدها)"),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                Text(
+                                                    t("Removes sponsored segments via FFmpeg during download", "حذف المقاطع الترويجية تلقائياً أثناء التنزيل"),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        Switch(
+                                            checked = cleanDownloadWithoutSponsors,
+                                            onCheckedChange = { cleanDownloadWithoutSponsors = it }
+                                        )
+                                    }
+                                }
+
                                 Button(
                                     onClick = {
                                         triggerDownloadWithDuplicateCheck {
-                                            model.run(ProbeAction.VIDEO, selectedHeight, selectedBitrate, videoFormat)
+                                            model.run(ProbeAction.VIDEO, selectedHeight, selectedBitrate, videoFormat, removeSponsors = cleanDownloadWithoutSponsors)
                                         }
                                     },
                                     enabled = !model.busy,
@@ -735,10 +800,40 @@ fun HomeScreen(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
 
+                                if (sponsorSegments.isNotEmpty()) {
+                                    Row(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .clickable { cleanDownloadWithoutSponsors = !cleanDownloadWithoutSponsors },
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            Icon(Icons.Default.ContentCut, contentDescription = null, tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(18.dp))
+                                            Column {
+                                                Text(
+                                                    t("Cut Sponsors (${sponsorSegments.size} detected)", "قص الرعايات (${sponsorSegments.size} تم رصدها)"),
+                                                    style = MaterialTheme.typography.bodyMedium,
+                                                    fontWeight = FontWeight.SemiBold
+                                                )
+                                                Text(
+                                                    t("Removes sponsored segments during audio extraction", "حذف المقاطع الترويجية عند استخراج الصوت"),
+                                                    style = MaterialTheme.typography.bodySmall,
+                                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            }
+                                        }
+                                        Switch(
+                                            checked = cleanDownloadWithoutSponsors,
+                                            onCheckedChange = { cleanDownloadWithoutSponsors = it }
+                                        )
+                                    }
+                                }
+
                                 Button(
                                     onClick = {
                                         triggerDownloadWithDuplicateCheck {
-                                            model.run(ProbeAction.MP3, selectedHeight, selectedBitrate)
+                                            model.run(ProbeAction.MP3, selectedHeight, selectedBitrate, removeSponsors = cleanDownloadWithoutSponsors)
                                         }
                                     },
                                     enabled = !model.busy,

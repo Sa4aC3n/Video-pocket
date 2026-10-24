@@ -1,4 +1,4 @@
-﻿package org.videopocket.probe.ui
+package org.videopocket.probe.ui
 
 import android.content.Intent
 import android.net.Uri
@@ -181,6 +181,73 @@ fun SettingsScreen(
                         context.startActivity(android.content.Intent(android.provider.Settings.ACTION_APP_NOTIFICATION_SETTINGS)
                             .putExtra(android.provider.Settings.EXTRA_APP_PACKAGE, context.packageName))
                     }) { Text(t("System notification settings", "إعدادات إشعارات النظام")) }
+                }
+            }
+        }
+
+        // SponsorBlock Section
+        Card(
+            shape = RoundedCornerShape(20.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Icon(Icons.Default.FastForward, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+                    Text(
+                        text = t("SponsorBlock (Ad & Sponsor Skipping)", "التخطي التلقائي للرعايات (SponsorBlock)"),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = t("Auto-Skip During Playback", "تخطي الرعايات تلقائياً في المشغل"),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = t("Instantly jump over sponsors, promos, and intro segments in video playback.", "القفز التلقائي اللحظي فوق إعلانات الرعاة والمقدمات الطويلة أثناء التشغيل."),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = AppSettings.sponsorBlockEnabled,
+                        onCheckedChange = { AppSettings.setSponsorBlock(it) }
+                    )
+                }
+
+                HorizontalDivider()
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(Modifier.weight(1f)) {
+                        Text(
+                            text = t("Clean Download by Default", "قص وإزالة الرعايات تلقائياً عند التنزيل"),
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = t("Cuts out promotional segments via FFmpeg during download for a 100% clean video.", "قص الأجزاء الترويجية ودمج الفيديو نظيفاً 100% بدون إعلانات عند التنزيل."),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                    Switch(
+                        checked = AppSettings.sponsorBlockRemoveOnDownload,
+                        onCheckedChange = { AppSettings.setSponsorBlockRemoveOnDownload(it) }
+                    )
                 }
             }
         }

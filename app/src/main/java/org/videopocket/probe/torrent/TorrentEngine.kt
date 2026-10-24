@@ -1,8 +1,12 @@
 package org.videopocket.probe.torrent
 
+import android.content.ContentValues
 import android.content.Context
 import android.media.MediaScannerConnection
 import android.os.Environment
+import android.provider.MediaStore
+import android.webkit.MimeTypeMap
+import androidx.compose.runtime.mutableStateListOf
 import kotlinx.coroutines.*
 import java.io.*
 import java.net.*
@@ -25,6 +29,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * - Real byte-level writing via RandomAccessFile
  * - Android MediaScanner indexing on completion
  */
+object TorrentTaskManager {
+    val tasks = mutableStateListOf<TorrentTask>()
+}
+
 class TorrentEngine(private val context: Context) {
 
     private val activeJobs = ConcurrentHashMap<String, Job>()
@@ -197,9 +205,8 @@ class TorrentEngine(private val context: Context) {
                     task.completedPieces = BooleanArray(task.piecesCount)
                 }
 
-                // Step 2: Prepare output file in public Downloads or internal storage
-                val downloadDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-                    ?: context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+                // Step 2: Prepare output file in app external/internal downloads
+                val downloadDir = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
                     ?: context.filesDir
 
                 if (!downloadDir.exists()) downloadDir.mkdirs()
@@ -238,6 +245,40 @@ class TorrentEngine(private val context: Context) {
                 if (task.downloadedBytes >= task.totalBytes && !cancelled.get()) {
                     targetRaf.close()
                     targetRaf = null
+
+                    // If multi-file torrent, extract files into directory structure
+                    if (task.files.size > 1 && targetFile != null) {
+                        try {
+                            val baseDir = File(downloadDir, task.name.substringBeforeLast('.'))
+                            baseDir.mkdirs()
+                            RandomAccessFile(targetFile, "r").use { reader ->
+                                var currentOffset = 0L
+                                for (entry in task.files) {
+                                    val entryFile = File(baseDir, entry.path)
+                                    entryFile.parentFile?.mkdirs()
+                                    reader.seek(currentOffset)
+                                    entryFile.outputStream().use { out ->
+                                        var remaining = entry.length
+                                        val buffer = ByteArray((64 * 1024).coerceAtMost(remaining.toInt().coerceAtLeast(1024)))
+                                        while (remaining > 0) {
+                                            val toRead = remaining.coerceAtMost(buffer.size.toLong()).toInt()
+                                            val read = reader.read(buffer, 0, toRead)
+                                            if (read <= 0) break
+                                            out.write(buffer, 0, read)
+                                            remaining -= read
+                                        }
+                                    }
+                                    currentOffset += entry.length
+                                }
+                            }
+                            task.outputPath = baseDir.absolutePath
+                        } catch (_: Exception) {}
+                    } else if (targetFile != null) {
+                        val publishedUri = publishToMediaStore(targetFile, task.name)
+                        if (publishedUri != null) {
+                            task.outputPath = publishedUri
+                        }
+                    }
 
                     task.state = TorrentState.COMPLETED
                     task.downloadSpeedBps = 0
@@ -732,6 +773,41 @@ class TorrentEngine(private val context: Context) {
         return peers
     }
 
+    private fun publishToMediaStore(tempFile: File, filename: String): String? {
+        val ext = filename.substringAfterLast('.', "").lowercase()
+        val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
+            ?: when (ext) {
+                "mp4" -> "video/mp4"
+                "mp3" -> "audio/mpeg"
+                "mkv" -> "video/x-matroska"
+                "webm" -> "video/webm"
+                "zip" -> "application/zip"
+                "pdf" -> "application/pdf"
+                else -> "application/octet-stream"
+            }
+
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, filename)
+            put(MediaStore.Downloads.MIME_TYPE, mime)
+            put(MediaStore.Downloads.RELATIVE_PATH, "Download/VideoPocket")
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return null
+        return try {
+            resolver.openOutputStream(uri)?.use { out ->
+                tempFile.inputStream().use { input -> input.copyTo(out, bufferSize = 128 * 1024) }
+            } ?: throw java.io.IOException("Cannot open output stream for MediaStore")
+            val finalized = resolver.update(uri, ContentValues().apply {
+                put(MediaStore.Downloads.IS_PENDING, 0)
+            }, null, null)
+            if (finalized > 0) uri.toString() else null
+        } catch (_: Exception) {
+            runCatching { resolver.delete(uri, null, null) }
+            null
+        }
+    }
+
     companion object {
         fun hexToBytes(hex: String): ByteArray {
             val cleanHex = hex.trim()
@@ -806,9 +882,11 @@ object BencodeParser {
     private fun decodeInteger(stream: InputStream): Long {
         val sb = StringBuilder()
         var b = stream.read()
-        while (b != -1 && b.toChar() != 'e') {
+        var count = 0
+        while (b != -1 && b.toChar() != 'e' && count < 25) {
             sb.append(b.toChar())
             b = stream.read()
+            count++
         }
         return sb.toString().toLongOrNull() ?: 0L
     }
@@ -816,17 +894,22 @@ object BencodeParser {
     private fun decodeStringOrBytes(stream: InputStream, firstDigit: Char): Any {
         val lengthSb = StringBuilder().append(firstDigit)
         var b = stream.read()
-        while (b != -1 && b.toChar() != ':') {
+        var count = 0
+        while (b != -1 && b.toChar() != ':' && count < 12) {
             lengthSb.append(b.toChar())
             b = stream.read()
+            count++
         }
         val length = lengthSb.toString().toIntOrNull() ?: 0
+        if (length < 0 || length > 16 * 1024 * 1024) {
+            return ByteArray(0)
+        }
         val bytes = ByteArray(length)
         var read = 0
         while (read < length) {
-            val count = stream.read(bytes, read, length - read)
-            if (count == -1) break
-            read += count
+            val countRead = stream.read(bytes, read, length - read)
+            if (countRead == -1) break
+            read += countRead
         }
 
         // If bytes contain non-text/null or length is 20 multiple and binary, keep ByteArray

@@ -1,4 +1,4 @@
-package org.videopocket.probe.core
+﻿package org.videopocket.probe.core
 
 fun problemMessage(code: String?, arabic: Boolean): String {
     val text = when (code) {

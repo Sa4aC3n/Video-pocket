@@ -1,4 +1,4 @@
-package org.videopocket.probe.processing
+﻿package org.videopocket.probe.processing
 
 import kotlin.math.floor
 

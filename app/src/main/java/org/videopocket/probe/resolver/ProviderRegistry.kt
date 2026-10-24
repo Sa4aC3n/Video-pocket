@@ -1,4 +1,4 @@
-package org.videopocket.probe.resolver
+﻿package org.videopocket.probe.resolver
 
 import org.videopocket.probe.engine.ProbeEngine
 

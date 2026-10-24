@@ -1,4 +1,4 @@
-package org.videopocket.probe.floating
+﻿package org.videopocket.probe.floating
 
 import android.animation.ValueAnimator
 import android.annotation.SuppressLint
@@ -212,6 +212,7 @@ class FloatingBubbleService : Service() {
         }
     }
 
+    @SuppressLint("ClickableViewAccessibility")
     private fun createCardView() {
         val layoutFlag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
@@ -455,6 +456,14 @@ class FloatingBubbleService : Service() {
             }
         }
         cardLayout.addView(stopServiceBtn)
+        cardLayout.setOnTouchListener { _, event ->
+            if (event.action == MotionEvent.ACTION_OUTSIDE) {
+                hideExpandedCard()
+                true
+            } else {
+                false
+            }
+        }
 
         cardView = cardLayout
     }

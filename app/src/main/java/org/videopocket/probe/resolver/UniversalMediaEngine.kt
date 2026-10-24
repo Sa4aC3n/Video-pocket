@@ -1,4 +1,4 @@
-package org.videopocket.probe.resolver
+﻿package org.videopocket.probe.resolver
 
 import android.content.Context
 import org.videopocket.probe.core.MediaInfo

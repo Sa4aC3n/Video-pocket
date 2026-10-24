@@ -27,6 +27,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
+import org.videopocket.probe.torrent.TorrentTaskManager
 import kotlinx.coroutines.launch
 import org.videopocket.probe.torrent.*
 import java.io.File
@@ -41,7 +42,7 @@ fun TorrentScreen(arabic: Boolean) {
 
     val torrentEngine = remember { TorrentEngine(context) }
     var magnetInput by rememberSaveable { mutableStateOf("") }
-    val torrentTasks = remember { mutableStateListOf<TorrentTask>() }
+    val torrentTasks = TorrentTaskManager.tasks
 
     fun startTask(task: TorrentTask) {
         torrentEngine.start(
@@ -301,30 +302,46 @@ fun TorrentTaskCard(
     fun t(en: String, ar: String) = if (arabic) ar else en
 
     fun openFile(filePath: String) {
-        val file = File(filePath)
-        if (!file.exists()) {
-            Toast.makeText(context, if (arabic) "الملف غير موجود" else "File not found", Toast.LENGTH_SHORT).show()
-            return
+        val uri = if (filePath.startsWith("content://")) {
+            Uri.parse(filePath)
+        } else {
+            val file = File(filePath)
+            if (!file.exists()) {
+                Toast.makeText(context, if (arabic) "الملف غير موجود" else "File not found", Toast.LENGTH_SHORT).show()
+                return
+            }
+            try {
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            } catch (_: Exception) {
+                Uri.fromFile(file)
+            }
         }
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, context.contentResolver.getType(uri) ?: "*/*")
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        runCatching { context.startActivity(Intent.createChooser(intent, file.name)) }
+        runCatching { context.startActivity(Intent.createChooser(intent, task.name)) }
             .onFailure { Toast.makeText(context, if (arabic) "لا يوجد تطبيق لفتح هذا الملف" else "No app found to open file", Toast.LENGTH_SHORT).show() }
     }
 
     fun shareFile(filePath: String) {
-        val file = File(filePath)
-        if (!file.exists()) return
-        val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+        val uri = if (filePath.startsWith("content://")) {
+            Uri.parse(filePath)
+        } else {
+            val file = File(filePath)
+            if (!file.exists()) return
+            try {
+                FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+            } catch (_: Exception) {
+                Uri.fromFile(file)
+            }
+        }
         val intent = Intent(Intent.ACTION_SEND).apply {
             type = context.contentResolver.getType(uri) ?: "*/*"
             putExtra(Intent.EXTRA_STREAM, uri)
-            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        runCatching { context.startActivity(Intent.createChooser(intent, file.name)) }
+        runCatching { context.startActivity(Intent.createChooser(intent, task.name)) }
     }
 
     Card(

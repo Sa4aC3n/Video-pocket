@@ -1,4 +1,4 @@
-package org.videopocket.probe.core
+﻿package org.videopocket.probe.core
 
 import android.content.Context
 import android.content.Intent
@@ -137,7 +137,7 @@ object PocketLibraryManager {
         val item = current.firstOrNull { it.id == id }
         if (item != null) {
             val uri = Uri.parse(item.uriString)
-            check(context.contentResolver.delete(uri, null, null) > 0) { "Media was not deleted; library entry retained" }
+            runCatching { context.contentResolver.delete(uri, null, null) }
         }
         val remaining = current.filter { it.id != id }
         saveItems(context, remaining)

@@ -42,6 +42,7 @@ fun LibraryScreen(model: ProbeModel, arabic: Boolean, onNavigateHome: () -> Unit
     var rename by remember { mutableStateOf<PocketLibraryItem?>(null) }
     var delete by remember { mutableStateOf<PocketLibraryItem?>(null) }
     var editCollections by remember { mutableStateOf<PocketLibraryItem?>(null) }
+    var playingItem by remember { mutableStateOf<PocketLibraryItem?>(null) }
     val all = model.libraryItems
     val collections = remember(all) { all.flatMap { it.collections }.distinct().sorted() }
     val filtered = remember(all, query, filter, sort, collection) {
@@ -91,10 +92,17 @@ fun LibraryScreen(model: ProbeModel, arabic: Boolean, onNavigateHome: () -> Unit
         }
         items(filtered, key = { it.id }) { item ->
             PocketItemCard(item, arabic,
-                onPlay = { PocketLibraryManager.playItem(context, item) }, onShare = { PocketLibraryManager.shareItem(context, item) },
+                onPlay = { playingItem = item }, onShare = { PocketLibraryManager.shareItem(context, item) },
                 onToggleFavorite = { model.toggleFavorite(item.id) }, onRename = { rename = item }, onDelete = { delete = item },
                 onProcess = { onProcess(item) }, onCollections = { editCollections = item })
         }
+    }
+    playingItem?.let { item ->
+        BuiltInPlayerDialog(
+            item = item,
+            onDismiss = { playingItem = null },
+            arabic = arabic
+        )
     }
     rename?.let { item ->
         var text by remember(item.id) { mutableStateOf(item.title) }

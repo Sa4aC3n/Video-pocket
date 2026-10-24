@@ -1,6 +1,10 @@
 package org.videopocket.probe.idm
 
+import android.content.ContentValues
 import android.content.Context
+import android.provider.MediaStore
+import android.webkit.MimeTypeMap
+import androidx.compose.runtime.mutableStateListOf
 import android.os.Environment
 import kotlinx.coroutines.*
 import java.io.File
@@ -23,6 +27,10 @@ import java.util.concurrent.atomic.AtomicBoolean
  * - Sequential chunk merging into public Downloads / target location.
  * - Non-range fallback for servers that don't support partial downloads.
  */
+object IdmTaskManager {
+    val tasks = mutableStateListOf<IdmTask>()
+}
+
 class IdmEngine(private val context: Context) {
 
     private val activeJobs = ConcurrentHashMap<String, Job>()
@@ -191,7 +199,7 @@ class IdmEngine(private val context: Context) {
                 onUpdate(task)
 
                 val destFile = mergeSegments(task, dir)
-                task.outputPath = destFile.absolutePath
+                if (task.outputPath.isNullOrBlank()) task.outputPath = destFile.absolutePath
                 task.state = IdmState.COMPLETED
                 task.downloadedBytes = destFile.length()
                 if (task.totalBytes <= 0) task.totalBytes = destFile.length()
@@ -292,16 +300,54 @@ class IdmEngine(private val context: Context) {
     /**
      * Merges individual segment files into the final destination file.
      */
+    private fun publishToMediaStore(tempFile: File, filename: String): String? {
+        val ext = filename.substringAfterLast('.', "").lowercase()
+        val mime = MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext)
+            ?: when (ext) {
+                "mp4" -> "video/mp4"
+                "mp3" -> "audio/mpeg"
+                "mkv" -> "video/x-matroska"
+                "webm" -> "video/webm"
+                "zip" -> "application/zip"
+                "pdf" -> "application/pdf"
+                "apk" -> "application/vnd.android.package-archive"
+                else -> "application/octet-stream"
+            }
+
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, filename)
+            put(MediaStore.Downloads.MIME_TYPE, mime)
+            put(MediaStore.Downloads.RELATIVE_PATH, "Download/VideoPocket")
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val resolver = context.contentResolver
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values) ?: return null
+        return try {
+            resolver.openOutputStream(uri)?.use { out ->
+                tempFile.inputStream().use { input -> input.copyTo(out, bufferSize = 128 * 1024) }
+            } ?: throw java.io.IOException("Cannot open output stream for MediaStore")
+            val finalized = resolver.update(uri, ContentValues().apply {
+                put(MediaStore.Downloads.IS_PENDING, 0)
+            }, null, null)
+            if (finalized > 0) uri.toString() else null
+        } catch (_: Exception) {
+            runCatching { resolver.delete(uri, null, null) }
+            null
+        }
+    }
+
+    /**
+     * Merges individual segment files into the final destination file, then publishes via MediaStore.
+     */
     private fun mergeSegments(task: IdmTask, dir: File): File {
-        val publicDownloads = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            ?: context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
+        val appDownloads = context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS)
             ?: context.filesDir
 
-        val dest = File(publicDownloads, task.filename)
+        val dest = File(appDownloads, task.filename)
         val finalFile = if (dest.exists()) {
             val base = task.filename.substringBeforeLast('.')
             val ext = task.filename.substringAfterLast('.', "")
-            File(publicDownloads, "${base}_${System.currentTimeMillis()}.${ext}")
+            File(appDownloads, "${base}_${System.currentTimeMillis()}.${ext}")
         } else dest
 
         finalFile.outputStream().use { out ->
@@ -317,6 +363,10 @@ class IdmEngine(private val context: Context) {
         }
 
         dir.deleteRecursively()
+
+        val publishedUri = publishToMediaStore(finalFile, task.filename)
+        task.outputPath = publishedUri ?: finalFile.absolutePath
+
         return finalFile
     }
 
@@ -331,23 +381,29 @@ class IdmEngine(private val context: Context) {
         taskWorkingDir(taskId).deleteRecursively()
     }
 
+    private fun sanitizeFilename(name: String): String {
+        val base = File(name).name.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim()
+        val cleaned = base.replace(Regex("^\\.+"), "").trim()
+        return if (cleaned.isNotBlank()) cleaned.take(120) else "download_${System.currentTimeMillis()}"
+    }
+
     private fun extractFilename(disposition: String?, url: String): String {
         if (!disposition.isNullOrBlank()) {
             val filenameMatch = Regex("filename\\*?=['\"]?(?:UTF-8'')?([^'\";\\n]+)['\"]?", RegexOption.IGNORE_CASE)
                 .find(disposition)
             if (filenameMatch != null) {
                 val raw = filenameMatch.groupValues[1]
-                return runCatching { URLDecoder.decode(raw, "UTF-8") }.getOrDefault(raw).trim()
+                val decoded = runCatching { URLDecoder.decode(raw, "UTF-8") }.getOrDefault(raw).trim()
+                return sanitizeFilename(decoded)
             }
         }
 
-        val path = URL(url).path
+        val path = runCatching { URL(url).path }.getOrDefault("")
         val lastSegment = path.substringAfterLast('/').substringBefore('?')
-        return if (lastSegment.isNotBlank()) {
+        val decoded = if (lastSegment.isNotBlank()) {
             runCatching { URLDecoder.decode(lastSegment, "UTF-8") }.getOrDefault(lastSegment)
-        } else {
-            "download_${System.currentTimeMillis()}"
-        }
+        } else ""
+        return sanitizeFilename(decoded)
     }
 
     companion object {

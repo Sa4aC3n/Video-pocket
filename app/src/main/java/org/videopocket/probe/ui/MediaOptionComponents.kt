@@ -1,4 +1,4 @@
-package org.videopocket.probe.ui
+﻿package org.videopocket.probe.ui
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background

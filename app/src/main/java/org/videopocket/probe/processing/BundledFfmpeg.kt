@@ -1,4 +1,4 @@
-package org.videopocket.probe.processing
+﻿package org.videopocket.probe.processing
 
 import android.content.Context
 import com.yausername.ffmpeg.FFmpeg

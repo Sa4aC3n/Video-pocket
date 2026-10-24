@@ -1,4 +1,4 @@
-package org.videopocket.probe.download
+﻿package org.videopocket.probe.download
 
 import android.content.Context
 import android.util.AtomicFile

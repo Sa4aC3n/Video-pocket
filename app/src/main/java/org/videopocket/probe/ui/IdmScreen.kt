@@ -4,6 +4,8 @@ import android.content.Intent
 import android.net.Uri
 import android.media.MediaScannerConnection
 import android.widget.Toast
+import androidx.core.content.FileProvider
+import org.videopocket.probe.idm.IdmTaskManager
 import java.io.File
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
@@ -48,7 +50,7 @@ fun IdmScreen(arabic: Boolean) {
     var idmInspecting by remember { mutableStateOf(false) }
     var idmInspectedTask by remember { mutableStateOf<IdmTask?>(null) }
     var idmSegmentsChoice by rememberSaveable { mutableIntStateOf(8) }
-    val idmTasks = remember { mutableStateListOf<IdmTask>() }
+    val idmTasks = IdmTaskManager.tasks
 
     var filterCategory by rememberSaveable { mutableStateOf<IdmCategory?>(null) }
 
@@ -496,25 +498,36 @@ fun IdmTaskCard(
             }
 
             if (task.state == IdmState.COMPLETED && !task.outputPath.isNullOrBlank()) {
-                val file = File(task.outputPath!!)
                 val context = LocalContext.current
+                val outputPath = task.outputPath!!
+                val resolveUri = {
+                    if (outputPath.startsWith("content://")) {
+                        Uri.parse(outputPath)
+                    } else {
+                        val file = File(outputPath)
+                        try {
+                            FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
+                        } catch (_: Exception) {
+                            Uri.fromFile(file)
+                        }
+                    }
+                }
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(top = 12.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Button(
                         onClick = {
-                            MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), null) { _, uri ->
-                                val targetUri = uri ?: Uri.fromFile(file)
-                                try {
-                                    val intent = Intent(Intent.ACTION_VIEW).apply {
-                                        setDataAndType(targetUri, "*/*")
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    }
-                                    context.startActivity(intent)
-                                } catch (_: Exception) {
-                                    Toast.makeText(context, if (arabic) "تعذر فتح الملف؛ تحقق من وجود تطبيق مناسب" else "Unable to open file", Toast.LENGTH_SHORT).show()
+                            try {
+                                val targetUri = resolveUri()
+                                val mime = context.contentResolver.getType(targetUri) ?: "*/*"
+                                val intent = Intent(Intent.ACTION_VIEW).apply {
+                                    setDataAndType(targetUri, mime)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
+                                context.startActivity(intent)
+                            } catch (_: Exception) {
+                                Toast.makeText(context, if (arabic) "تعذر فتح الملف؛ تحقق من وجود تطبيق مناسب" else "Unable to open file", Toast.LENGTH_SHORT).show()
                             }
                         },
                         modifier = Modifier.weight(1f),
@@ -527,19 +540,18 @@ fun IdmTaskCard(
 
                     OutlinedButton(
                         onClick = {
-                            MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), null) { _, uri ->
-                                val targetUri = uri ?: Uri.fromFile(file)
-                                try {
-                                    val intent = Intent(Intent.ACTION_SEND).apply {
-                                        type = "*/*"
-                                        putExtra(Intent.EXTRA_STREAM, targetUri)
-                                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    }
-                                    context.startActivity(Intent.createChooser(intent, task.filename).apply {
-                                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    })
-                                } catch (_: Exception) {}
-                            }
+                            try {
+                                val targetUri = resolveUri()
+                                val mime = context.contentResolver.getType(targetUri) ?: "*/*"
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = mime
+                                    putExtra(Intent.EXTRA_STREAM, targetUri)
+                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION or Intent.FLAG_ACTIVITY_NEW_TASK)
+                                }
+                                context.startActivity(Intent.createChooser(intent, task.filename).apply {
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                                })
+                            } catch (_: Exception) {}
                         },
                         modifier = Modifier.weight(1f),
                         shape = RoundedCornerShape(10.dp)

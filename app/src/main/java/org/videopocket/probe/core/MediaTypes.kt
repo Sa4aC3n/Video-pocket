@@ -1,4 +1,4 @@
-package org.videopocket.probe.core
+﻿package org.videopocket.probe.core
 
 import java.util.Locale
 

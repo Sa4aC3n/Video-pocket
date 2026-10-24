@@ -1,4 +1,4 @@
-package org.videopocket.probe.core
+﻿package org.videopocket.probe.core
 
 object MediaIdentity {
     fun sameSource(item: PocketLibraryItem, url: String?, id: String?, platform: String?): Boolean =

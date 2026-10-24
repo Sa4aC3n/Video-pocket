@@ -1,4 +1,4 @@
-package org.videopocket.probe.floating
+﻿package org.videopocket.probe.floating
 
 import android.content.Context
 import android.content.Intent

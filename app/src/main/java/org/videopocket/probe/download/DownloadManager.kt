@@ -1,4 +1,4 @@
-package org.videopocket.probe.download
+﻿package org.videopocket.probe.download
 
 import android.app.Application
 import android.content.Context
@@ -214,6 +214,7 @@ class DownloadQueueManager(
     fun close() {
         closed = true
         engines.values.forEach { it.cancelCurrent() }
+        ServiceController.forceStop(application)
         persist()
         saves.close()
         scope.cancel()
@@ -240,6 +241,7 @@ class DownloadQueueManager(
     }
 
     private suspend fun runTask(task: DownloadTask, engine: ProbeEngine) {
+        ServiceController.acquire(application)
         fun cancelled() = tasks.firstOrNull { it.id == task.id }?.state == DownloadState.CANCELLED
         val speedMeter = SpeedMeter()
         var lastBytesReported = 0L
@@ -343,6 +345,7 @@ class DownloadQueueManager(
             speedMeter.reset()
             engines.remove(task.id)
             activeJobs.remove(task.id)
+            ServiceController.release(application)
             processNext()
         }
     }

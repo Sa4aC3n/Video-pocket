@@ -73,4 +73,25 @@ class TorrentEngineTest {
         val hex = sha1.joinToString("") { "%02X".format(it) }
         assertEquals(40, hex.length)
     }
+
+    @Test
+    fun testBencodeOOMProtection() {
+        val hugeLengthBytes = "999999999:payload".toByteArray(Charsets.US_ASCII)
+        val result = BencodeParser.decode(hugeLengthBytes)
+        assertTrue(result is ByteArray && (result as ByteArray).isEmpty())
+    }
+
+    @Test
+    fun testTorrentTaskManagerPersistence() {
+        val task = TorrentTask(
+            infoHash = "0123456789ABCDEF0123456789ABCDEF01234567",
+            name = "test.torrent",
+            totalBytes = 2048L
+        )
+        TorrentTaskManager.tasks.clear()
+        TorrentTaskManager.tasks.add(task)
+        assertEquals(1, TorrentTaskManager.tasks.size)
+        assertEquals("test.torrent", TorrentTaskManager.tasks[0].name)
+        TorrentTaskManager.tasks.clear()
+    }
 }

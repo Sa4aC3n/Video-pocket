@@ -1,4 +1,4 @@
-package org.videopocket.probe.resolver
+﻿package org.videopocket.probe.resolver
 
 import android.content.ContentValues
 import android.content.Context

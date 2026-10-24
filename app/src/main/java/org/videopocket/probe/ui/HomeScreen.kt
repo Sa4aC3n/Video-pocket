@@ -57,6 +57,7 @@ fun HomeScreen(
     var showBatchDownload by remember { mutableStateOf(false) }
     var showStorageManager by remember { mutableStateOf(false) }
     var showDownloadOptionsSheet by remember { mutableStateOf(false) }
+    var showSubtitleDialog by remember { mutableStateOf(false) }
 
     var duplicateItemToConfirm by remember { mutableStateOf<PocketLibraryItem?>(null) }
     var pendingDownloadAction by remember { mutableStateOf<(() -> Unit)?>(null) }
@@ -536,13 +537,28 @@ fun HomeScreen(
                                 }
 
                                 if (media.subtitles.isNotEmpty()) {
-                                    Badge(containerColor = MaterialTheme.colorScheme.tertiaryContainer) {
-                                        Text(
-                                            text = "CC (${media.subtitles.size})",
-                                            color = MaterialTheme.colorScheme.onTertiaryContainer,
-                                            style = MaterialTheme.typography.labelSmall,
-                                            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
-                                        )
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = MaterialTheme.colorScheme.tertiaryContainer,
+                                        modifier = Modifier.clickable { showSubtitleDialog = true }
+                                    ) {
+                                        Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Icon(
+                                                Icons.Default.Subtitles,
+                                                contentDescription = null,
+                                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                modifier = Modifier.size(14.dp)
+                                            )
+                                            Spacer(Modifier.width(4.dp))
+                                            Text(
+                                                text = "CC (${media.subtitles.size})",
+                                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                                style = MaterialTheme.typography.labelSmall
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -928,5 +944,13 @@ fun HomeScreen(
     }
     if (showStorageManager) {
         StorageManagerDialog(onDismiss = { showStorageManager = false }, arabic = arabic)
+    }
+    if (showSubtitleDialog && model.info != null) {
+        SubtitleCenterDialog(
+            title = model.info!!.title,
+            subtitles = model.info!!.subtitles,
+            onDismiss = { showSubtitleDialog = false },
+            arabic = arabic
+        )
     }
 }

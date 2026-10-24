@@ -1,4 +1,4 @@
-package org.videopocket.probe.resolver
+﻿package org.videopocket.probe.resolver
 
 import android.net.Uri
 import org.videopocket.probe.core.*

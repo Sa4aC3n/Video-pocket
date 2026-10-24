@@ -1,4 +1,4 @@
-package org.videopocket.probe.core
+﻿package org.videopocket.probe.core
 
 /** Wrapper 0.18.1 still bundles 4 KB-aligned WebP dependencies inside its FFmpeg archive. */
 object NativeRuntimePolicy {

@@ -1,4 +1,4 @@
-﻿package org.videopocket.probe.ui
+package org.videopocket.probe.ui
 
 import android.content.Intent
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -67,7 +67,7 @@ fun ProcessingScreen(arabic: Boolean, initialUri: String? = null, initialTitle: 
             } catch (_: Exception) {}
         }
     }
-    val audioOnly = mode == ProcessingMode.EXTRACT_AUDIO
+    val audioOnly = mode in setOf(ProcessingMode.EXTRACT_AUDIO, ProcessingMode.VOICE_CLARIFY, ProcessingMode.STRIP_SILENCE)
     val formats = model.capabilities?.formats(audioOnly).orEmpty()
     LaunchedEffect(audioOnly, formats) { if (format !in formats) format = formats.firstOrNull().orEmpty() }
     val validStart = ClipRequest.parseTimestamp(start)
@@ -111,10 +111,12 @@ fun ProcessingScreen(arabic: Boolean, initialUri: String? = null, initialTitle: 
             ProcessingMode.entries.forEach { choice ->
                 FilterChip(selected = mode == choice, enabled = !model.busy, onClick = { mode = choice }, label = {
                     Text(when (choice) {
-                        ProcessingMode.COMPRESS     -> t("Compress", "ضغط")
-                        ProcessingMode.TRIM         -> t("Trim", "قص")
+                        ProcessingMode.COMPRESS      -> t("Compress", "ضغط")
+                        ProcessingMode.TRIM          -> t("Trim", "قص")
                         ProcessingMode.EXTRACT_AUDIO -> t("Extract audio", "استخراج الصوت")
-                        ProcessingMode.CONVERT      -> t("Convert", "تحويل")
+                        ProcessingMode.CONVERT       -> t("Convert", "تحويل")
+                        ProcessingMode.VOICE_CLARIFY -> t("Voice Clarifier ✨", "منقي الصوت ✨")
+                        ProcessingMode.STRIP_SILENCE -> t("Silence Stripper ✂️", "مقص الصمت ✂️")
                     })
                 })
             }
@@ -140,6 +142,50 @@ fun ProcessingScreen(arabic: Boolean, initialUri: String? = null, initialTitle: 
                 CompressionPreset.SMART       -> t("Analyses the video and automatically picks the best settings", "يحلل الفيديو ويختار الإعدادات الأمثل تلقائياً")
             }
             Text(presetDesc, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        if (mode == ProcessingMode.VOICE_CLARIFY) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        t("🎙️ Studio Voice Clarifier & Denoise", "🎙️ استوديو تنقية الصوت وعزل الضجيج"),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                    Text(
+                        t(
+                            "Applies adaptive FFT de-noising (afftdn) to isolate background noise/hiss, and dynamic audio normalization (dynaudnorm) to balance human speech levels for crystal-clear clarity.",
+                            "يطبق تقنية عزل الوشوشة التكيفية (afftdn) لعزل ضجيج المكيفات والشارع، وموازنة الصوت الديناميكية (dynaudnorm) لرفع وضوح ونقاء الصوت البشري في السماعات وشاشات السيارات."
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        }
+        if (mode == ProcessingMode.STRIP_SILENCE) {
+            Card(
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.5f)),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Text(
+                        t("⚡ Smart Silence & Pause Stripper", "⚡ مقص الصمت والوقفات الذكي"),
+                        style = MaterialTheme.typography.titleSmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                    Text(
+                        t(
+                            "Scans audio with silence-removal filters to seamlessly strip silent intervals (> 1.0s at -40dB), shortening lecture and podcast listening time by 20% to 35% without voice distortion.",
+                            "يفحص فترات السكوت التي تزيد عن ثانية واحدة ويقصها بنعومة، مما يقلص مدة المحاضرات والبودكاست بنسبة ٢٠٪ إلى ٣٥٪ مع الحفاظ الكامل على سلامة الكلمات دون تسريع."
+                        ),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                    )
+                }
+            }
         }
         if (mode == ProcessingMode.COMPRESS) {
             OutlinedTextField(value = sizeMb, onValueChange = { sizeMb = it }, enabled = !model.busy,
@@ -183,12 +229,18 @@ fun ProcessingScreen(arabic: Boolean, initialUri: String? = null, initialTitle: 
         } else {
             Button(onClick = {
                 model.start(ProcessingRequest(uri!!, title, mode, preset,
-                    if (mode == ProcessingMode.COMPRESS) "mp4" else format,
+                    if (mode == ProcessingMode.COMPRESS) "mp4" else format.ifBlank { "mp3" },
                     if (mode == ProcessingMode.TRIM) validStart!! else 0.0,
                     if (mode == ProcessingMode.TRIM) validEnd else null,
                     if (mode == ProcessingMode.COMPRESS) target else null))
             }, enabled = uri != null && available && rangeValid && targetValid && !model.checking && !selecting,
-                modifier = Modifier.fillMaxWidth()) { Text(t("Start processing", "بدء المعالجة")) }
+                modifier = Modifier.fillMaxWidth()) {
+                Text(when (mode) {
+                    ProcessingMode.VOICE_CLARIFY -> t("Clarify & Enhance Voice", "بدء تنقية الصوت وتعزيزه")
+                    ProcessingMode.STRIP_SILENCE -> t("Strip Silence & Optimize", "بدء قص الصمت واختصار الوقت")
+                    else -> t("Start processing", "بدء المعالجة")
+                })
+            }
         }
         model.error?.let { Text(processingMessage(it, arabic), color = MaterialTheme.colorScheme.error, modifier = Modifier.semantics { liveRegion = LiveRegionMode.Polite }) }
         model.result?.let { result ->

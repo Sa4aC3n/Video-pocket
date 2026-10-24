@@ -44,6 +44,23 @@ class ProcessingPolicyTest {
         val video = ProcessingPolicy.videoBitrate(10_000_000, 60.0, false)
         assertEquals(video - 128_000, ProcessingPolicy.videoBitrate(10_000_000, 60.0, true))
     }
+    @Test fun audioFiltersConfiguredCorrectlyForVoiceClarifierAndSilenceStripper() {
+        assertEquals("afftdn=nf=-25,dynaudnorm=f=150:g=15", ProcessingPolicy.audioFilter(ProcessingMode.VOICE_CLARIFY))
+        assertEquals("silenceremove=stop_periods=-1:stop_duration=1:stop_threshold=-40dB", ProcessingPolicy.audioFilter(ProcessingMode.STRIP_SILENCE))
+        assertNull(ProcessingPolicy.audioFilter(ProcessingMode.COMPRESS))
+        assertNull(ProcessingPolicy.audioFilter(ProcessingMode.TRIM))
+        assertNull(ProcessingPolicy.audioFilter(ProcessingMode.EXTRACT_AUDIO))
+        assertNull(ProcessingPolicy.audioFilter(ProcessingMode.CONVERT))
+    }
+
+    @Test fun audioEnhancementModesPreserveSourceDurationInPlanner() {
+        val clarifyReq = ProcessingRequest("content://test", "audio", ProcessingMode.VOICE_CLARIFY)
+        assertEquals(120.0, ProcessingPolicy.duration(clarifyReq, 120.0), 0.001)
+
+        val silenceReq = ProcessingRequest("content://test", "audio", ProcessingMode.STRIP_SILENCE)
+        assertEquals(300.0, ProcessingPolicy.duration(silenceReq, 300.0), 0.001)
+    }
+
     @Test fun parsesFfmpegCapabilitiesWithoutInventingAliases() {
         val encoders = ProcessingPolicy.parseCodecs(" V....D libx264 H.264\n A..... aac AAC\n ------\n")
         assertEquals(setOf("libx264", "aac"), encoders)

@@ -1,4 +1,4 @@
-﻿package org.videopocket.probe.processing
+package org.videopocket.probe.processing
 
 import android.content.Context
 import android.media.MediaExtractor
@@ -153,9 +153,9 @@ class LocalMediaProcessor(private val context: Context) {
             val source = inspect(input)
             val seconds = try { ProcessingPolicy.duration(request, source.seconds) }
                 catch (_: IllegalArgumentException) { throw ProcessingFailure("INVALID_RANGE") }
-            val audioOnly = request.mode == ProcessingMode.EXTRACT_AUDIO
+            val audioOnly = request.mode in setOf(ProcessingMode.EXTRACT_AUDIO, ProcessingMode.VOICE_CLARIFY, ProcessingMode.STRIP_SILENCE)
             if (audioOnly && !source.audio || !audioOnly && !source.video) throw ProcessingFailure("MISSING_TRACK")
-            val format = if (request.mode == ProcessingMode.COMPRESS) "mp4" else request.format.lowercase(Locale.ROOT)
+            val format = if (request.mode == ProcessingMode.COMPRESS) "mp4" else request.format.lowercase(Locale.ROOT).ifBlank { "mp3" }
             if (format !in capabilities.formats(audioOnly)) throw ProcessingFailure("FORMAT_UNAVAILABLE")
             // Resolve SMART preset to a concrete preset based on source analysis
             val resolvedPreset = if (request.preset == CompressionPreset.SMART && request.mode == ProcessingMode.COMPRESS) {
@@ -179,6 +179,19 @@ class LocalMediaProcessor(private val context: Context) {
                 if (request.mode == ProcessingMode.TRIM) args.addAll(listOf("-ss", String.format(Locale.US, "%.6f", request.startSeconds), "-t", String.format(Locale.US, "%.6f", seconds)))
                 args.addAll(listOf("-map_metadata", "-1", "-map_chapters", "-1"))
                 if (audioOnly) {
+                    args.addAll(listOf(
+                        "-metadata", "title=${request.title}",
+                        "-metadata", "artist=Video Pocket",
+                        "-metadata", "album=Video Pocket Studio",
+                        "-metadata", "comment=Processed with Video Pocket Smart Audio"
+                    ))
+                    if (format == "mp3") {
+                        args.addAll(listOf("-id3v2_version", "3"))
+                    }
+                    val filter = ProcessingPolicy.audioFilter(request.mode)
+                    if (filter != null) {
+                        args.addAll(listOf("-af", filter))
+                    }
                     args.addAll(listOf("-map", "0:a:0", "-vn", "-c:a", encoder))
                 } else {
                     args.addAll(listOf("-map", "0:v:0", "-map", "0:a:0?", "-c:v", encoder,
@@ -210,8 +223,13 @@ class LocalMediaProcessor(private val context: Context) {
             checkCancelled()
             onProgress(ProcessingUpdate(null, "VALIDATING"))
             val actual = inspect(output)
+            val durationValid = if (request.mode == ProcessingMode.STRIP_SILENCE) {
+                actual.seconds > 0 && actual.seconds <= seconds + 1.0
+            } else {
+                kotlin.math.abs(actual.seconds - seconds) <= maxOf(1.0, seconds * 0.05)
+            }
             if (output.length() <= 0 || audioOnly && (!actual.audio || actual.video) || !audioOnly && !actual.video || source.audio && !actual.audio ||
-                kotlin.math.abs(actual.seconds - seconds) > maxOf(1.0, seconds * 0.05)) throw ProcessingFailure("INVALID_OUTPUT")
+                !durationValid) throw ProcessingFailure("INVALID_OUTPUT")
             if (request.mode == ProcessingMode.COMPRESS && output.length() >= input.length()) throw ProcessingFailure("NO_SIZE_REDUCTION")
             synchronized(lock) { checkCancelled(); publishing = true }
             onProgress(ProcessingUpdate(null, "SAVING"))
@@ -220,8 +238,13 @@ class LocalMediaProcessor(private val context: Context) {
             // Original URI was opened for read only. Only our own new row may be rolled back.
             try {
                 val media = SavedMedia.read(context, savedUri)
+                val modeLabel = when (request.mode) {
+                    ProcessingMode.VOICE_CLARIFY -> if (AppSettings.isArabic) "منقى الصوت" else "Voice Clarified"
+                    ProcessingMode.STRIP_SILENCE -> if (AppSettings.isArabic) "مقصوص الصمت" else "Silence Stripped"
+                    else -> request.mode.name
+                }
                 PocketLibraryManager.addItem(context, PocketLibraryItem(
-                    id = UUID.randomUUID().toString(), title = request.title + " · " + request.mode.name,
+                    id = UUID.randomUUID().toString(), title = request.title + " · " + modeLabel,
                     uriString = savedUri, isClip = request.mode == ProcessingMode.TRIM,
                     clipRange = if (request.mode == ProcessingMode.TRIM) "${ClipRequest.formatSeconds(request.startSeconds)} → ${ClipRequest.formatSeconds(request.endSeconds!!)}" else null,
                     duration = media.durationMs?.let { ClipRequest.formatSeconds(it / 1000.0) } ?: "—",

@@ -1,4 +1,4 @@
-﻿package org.videopocket.probe.engine
+package org.videopocket.probe.engine
 
 import android.content.ContentValues
 import android.content.Context
@@ -302,7 +302,11 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 .addOption("--merge-output-format", if (outputFormat == "auto") "mkv" else outputFormat)
             if (outputFormat != "auto" && action != ProbeAction.MP3) req.addOption("--remux-video", outputFormat)
             if (action == ProbeAction.MP3) req.addOption("--extract-audio")
-                .addOption("--audio-format", "mp3").addOption("--audio-quality", "${bitrate}K")
+                .addOption("--audio-format", "mp3")
+                .addOption("--audio-quality", "${bitrate}K")
+                .addOption("--embed-metadata")
+                .addOption("--embed-thumbnail")
+                .addOption("--convert-thumbnails", "jpg")
 
             checkCancelled()
             withResourceGuard(id) {
@@ -443,6 +447,9 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 req.addOption("-x")
                     .addOption("--audio-format", "mp3")
                     .addOption("--audio-quality", "${bitrate}K")
+                    .addOption("--embed-metadata")
+                    .addOption("--embed-thumbnail")
+                    .addOption("--convert-thumbnails", "jpg")
             } else {
                 req.addOption("--format", "bestvideo[height<=$height]+bestaudio/best[height<=$height]/best")
                     .addOption("--merge-output-format", if (outputFormat == "auto") "mkv" else outputFormat)

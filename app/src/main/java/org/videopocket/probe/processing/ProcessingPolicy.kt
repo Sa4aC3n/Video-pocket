@@ -1,8 +1,8 @@
-﻿package org.videopocket.probe.processing
+package org.videopocket.probe.processing
 
 import kotlin.math.floor
 
-enum class ProcessingMode { COMPRESS, TRIM, EXTRACT_AUDIO, CONVERT }
+enum class ProcessingMode { COMPRESS, TRIM, EXTRACT_AUDIO, CONVERT, VOICE_CLARIFY, STRIP_SILENCE }
 
 /**
  * Compression presets.
@@ -91,4 +91,10 @@ object ProcessingPolicy {
     fun parseMuxers(output: String): Set<String> = output.lineSequence().mapNotNull { line ->
         Regex("^\\s*E\\s+([a-zA-Z0-9_,]+)\\s").find(line)?.groupValues?.get(1)
     }.flatMap { it.split(',') }.toSet()
+
+    fun audioFilter(mode: ProcessingMode): String? = when (mode) {
+        ProcessingMode.VOICE_CLARIFY -> "afftdn=nf=-25,dynaudnorm=f=150:g=15"
+        ProcessingMode.STRIP_SILENCE -> "silenceremove=stop_periods=-1:stop_duration=1:stop_threshold=-40dB"
+        else -> null
+    }
 }

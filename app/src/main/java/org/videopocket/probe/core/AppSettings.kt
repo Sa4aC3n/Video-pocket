@@ -141,6 +141,7 @@ object AppSettings {
         }
     }
 
+    @JvmName("updateSponsorBlockRemoveOnDownload")
     fun setSponsorBlockRemoveOnDownload(enabled: Boolean) {
         sponsorBlockRemoveOnDownload = enabled
         if (::prefs.isInitialized) {

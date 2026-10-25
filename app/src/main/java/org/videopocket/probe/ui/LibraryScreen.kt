@@ -226,7 +226,15 @@ fun LibraryScreen(
             arabic = arabic,
             onDismiss = { showPocketBeamDialog = false },
             onPlayReceived = { uri, name ->
-                model.playMedia(uri, name)
+                playingItem = PocketLibraryItem(
+                    id = uri.toString(),
+                    title = name,
+                    uriString = uri.toString(),
+                    duration = "",
+                    resolution = "",
+                    format = "",
+                    fileSizeBytes = 0L
+                )
             }
         )
     }

@@ -142,7 +142,7 @@ fun PocketBeamDialog(
                 TabRow(
                     selectedTabIndex = selectedTab,
                     containerColor = MaterialTheme.colorScheme.surfaceVariant,
-                    shape = RoundedCornerShape(14.dp),
+                    modifier = Modifier.clip(RoundedCornerShape(14.dp)),
                     indicator = {},
                     divider = {}
                 ) {
@@ -197,7 +197,7 @@ fun PocketBeamDialog(
                                 val item = selectedItem ?: return@SendModeContent
                                 scope.launch(Dispatchers.IO) {
                                     val session = beamServer.startServing(
-                                        fileUri = item.contentUri,
+                                        fileUri = Uri.parse(item.uriString),
                                         fileName = item.title.let { if (it.endsWith(".${item.format}")) it else "$it.${item.format}" },
                                         mimeType = if (org.videopocket.probe.core.MediaTypes.isAudio(item.format)) "audio/mpeg" else "video/mp4",
                                         fileSize = item.fileSizeBytes

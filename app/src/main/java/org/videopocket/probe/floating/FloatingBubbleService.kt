@@ -62,7 +62,7 @@ class FloatingBubbleService : Service() {
         super.onCreate()
         AppSettings.init(this)
         probeEngine = ProbeEngine(applicationContext)
-        queueManager = DownloadQueueManager(applicationContext, probeEngine)
+        queueManager = DownloadQueueManager(application, probeEngine)
 
         // 1. Optional status notification
         runCatching {
@@ -497,8 +497,9 @@ class FloatingBubbleService : Service() {
         val cleanUrl = org.videopocket.probe.core.LinkPolicy.extractUrl(clipText)
 
         cardView?.let { card ->
-            val input = ((card as? ViewGroup)?.getChildAt(1) as? ViewGroup)?.getChildAt(0) as? EditText
-            val status = card.getChildAt(2) as? TextView
+            val cardGroup = card as? ViewGroup
+            val input = (cardGroup?.getChildAt(1) as? ViewGroup)?.getChildAt(0) as? EditText
+            val status = cardGroup?.getChildAt(2) as? TextView
 
             if (isValidUrl(cleanUrl)) {
                 input?.setText(cleanUrl)

@@ -1,3 +1,6 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -22,29 +25,31 @@ android {
     }
 
     val keystorePropertiesFile = rootProject.file("local.properties")
-    val keystoreProperties = java.util.Properties()
+    val keystoreProperties = Properties()
     if (keystorePropertiesFile.exists()) {
-        keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
+        FileInputStream(keystorePropertiesFile).use {
+            keystoreProperties.load(it)
+        }
     }
 
     signingConfigs {
         create("release") {
             val defaultKeyFile = file("videopocket-release.jks")
-            val keyPath = System.getenv("KEYSTORE_PATH")
-                ?: keystoreProperties.getProperty("release.keystorePath")
-                ?: if (defaultKeyFile.exists()) defaultKeyFile.absolutePath else null
+            val envPath: String? = System.getenv("KEYSTORE_PATH")
+            val propPath: String? = keystoreProperties.getProperty("release.keystorePath")
+            val keyPath = envPath ?: propPath ?: if (defaultKeyFile.exists()) defaultKeyFile.absolutePath else null
 
-            val keyPass = System.getenv("KEYSTORE_PASSWORD")
-                ?: keystoreProperties.getProperty("release.keystorePassword")
-                ?: "videopocket"
+            val envPass: String? = System.getenv("KEYSTORE_PASSWORD")
+            val propPass: String? = keystoreProperties.getProperty("release.keystorePassword")
+            val keyPass = envPass ?: propPass ?: "videopocket"
 
-            val alias = System.getenv("KEY_ALIAS")
-                ?: keystoreProperties.getProperty("release.keyAlias")
-                ?: "videopocket"
+            val envAlias: String? = System.getenv("KEY_ALIAS")
+            val propAlias: String? = keystoreProperties.getProperty("release.keyAlias")
+            val alias = envAlias ?: propAlias ?: "videopocket"
 
-            val aliasPass = System.getenv("KEY_PASSWORD")
-                ?: keystoreProperties.getProperty("release.keyPassword")
-                ?: keyPass
+            val envAliasPass: String? = System.getenv("KEY_PASSWORD")
+            val propAliasPass: String? = keystoreProperties.getProperty("release.keyPassword")
+            val aliasPass = envAliasPass ?: propAliasPass ?: keyPass
 
             if (!keyPath.isNullOrEmpty() && file(keyPath).exists()) {
                 storeFile = file(keyPath)

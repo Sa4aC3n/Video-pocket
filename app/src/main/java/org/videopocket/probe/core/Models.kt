@@ -122,7 +122,7 @@ data class PocketLibraryItem(
     val id: String,
     val title: String,
     val uriString: String,
-    val isClip: Boolean,
+    val isClip: Boolean = false,
     val clipRange: String? = null,
     val duration: String,
     val resolution: String,

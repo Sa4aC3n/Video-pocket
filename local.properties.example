@@ -5,10 +5,11 @@
 # Path to your Android SDK installation:
 sdk.dir=C:\\Users\\Administrator\\AppData\\Local\\Android\\Sdk
 
-# Release Signing Keystore Configuration (Optional for debug; required for signed release AAB/APK):
-# Alternatively, you can pass these as environment variables:
+# Release Signing Keystore Configuration (Upload Key for Google Play):
+# Default path looks for 'app/videopocket-release.jks' with keyAlias 'videopocket'
+# Alternatively, configure via environment variables:
 # KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
-release.keystorePath=../my-release-key.jks
+release.keystorePath=videopocket-release.jks
 release.keystorePassword=YourKeystorePasswordHere
-release.keyAlias=my-key-alias
+release.keyAlias=videopocket
 release.keyPassword=YourKeyPasswordHere

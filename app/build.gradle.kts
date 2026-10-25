@@ -13,8 +13,8 @@ android {
         applicationId = "org.videopocket.probe"
         minSdk = 29
         targetSdk = 36
-        versionCode = 6
-        versionName = "0.3.2"
+        versionCode = 10
+        versionName = "10"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["useTestStorageService"] = "true"
@@ -29,10 +29,22 @@ android {
 
     signingConfigs {
         create("release") {
-            val keyPath = System.getenv("KEYSTORE_PATH") ?: keystoreProperties.getProperty("release.keystorePath")
-            val keyPass = System.getenv("KEYSTORE_PASSWORD") ?: keystoreProperties.getProperty("release.keystorePassword")
-            val alias = System.getenv("KEY_ALIAS") ?: keystoreProperties.getProperty("release.keyAlias")
-            val aliasPass = System.getenv("KEY_PASSWORD") ?: keystoreProperties.getProperty("release.keyPassword")
+            val defaultKeyFile = file("videopocket-release.jks")
+            val keyPath = System.getenv("KEYSTORE_PATH")
+                ?: keystoreProperties.getProperty("release.keystorePath")
+                ?: if (defaultKeyFile.exists()) defaultKeyFile.absolutePath else null
+
+            val keyPass = System.getenv("KEYSTORE_PASSWORD")
+                ?: keystoreProperties.getProperty("release.keystorePassword")
+                ?: "videopocket"
+
+            val alias = System.getenv("KEY_ALIAS")
+                ?: keystoreProperties.getProperty("release.keyAlias")
+                ?: "videopocket"
+
+            val aliasPass = System.getenv("KEY_PASSWORD")
+                ?: keystoreProperties.getProperty("release.keyPassword")
+                ?: keyPass
 
             if (!keyPath.isNullOrEmpty() && file(keyPath).exists()) {
                 storeFile = file(keyPath)

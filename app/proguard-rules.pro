@@ -61,6 +61,9 @@
 -keep class org.videopocket.probe.processing.ProcessingMode { *; }
 -keep class org.videopocket.probe.resolver.** { *; }
 -keep class org.videopocket.probe.engine.** { *; }
+-keep class org.videopocket.probe.vault.** { *; }
+-keep class org.videopocket.probe.sponsorblock.** { *; }
+-keep class org.videopocket.probe.floating.** { *; }
 
 # R8 default passes (do not force multi-pass optimization in constrained CI/Cloud environments)
 

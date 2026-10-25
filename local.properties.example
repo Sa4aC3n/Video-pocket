@@ -1,0 +1,14 @@
+## Video Pocket — Local Properties Configuration Example
+## Copy this file to 'local.properties' and fill in your values.
+## IMPORTANT: Never commit 'local.properties' or your keystore file to version control.
+
+# Path to your Android SDK installation:
+sdk.dir=C:\\Users\\Administrator\\AppData\\Local\\Android\\Sdk
+
+# Release Signing Keystore Configuration (Optional for debug; required for signed release AAB/APK):
+# Alternatively, you can pass these as environment variables:
+# KEYSTORE_PATH, KEYSTORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+release.keystorePath=../my-release-key.jks
+release.keystorePassword=YourKeystorePasswordHere
+release.keyAlias=my-key-alias
+release.keyPassword=YourKeyPasswordHere

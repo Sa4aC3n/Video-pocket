@@ -15,10 +15,32 @@ android {
         targetSdk = 36
         versionCode = 6
         versionName = "0.3.2"
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["useTestStorageService"] = "true"
         buildConfigField("boolean", "ENABLE_TORRENT", "true")
+    }
+
+    val keystorePropertiesFile = rootProject.file("local.properties")
+    val keystoreProperties = java.util.Properties()
+    if (keystorePropertiesFile.exists()) {
+        keystoreProperties.load(java.io.FileInputStream(keystorePropertiesFile))
+    }
+
+    signingConfigs {
+        create("release") {
+            val keyPath = System.getenv("KEYSTORE_PATH") ?: keystoreProperties.getProperty("release.keystorePath")
+            val keyPass = System.getenv("KEYSTORE_PASSWORD") ?: keystoreProperties.getProperty("release.keystorePassword")
+            val alias = System.getenv("KEY_ALIAS") ?: keystoreProperties.getProperty("release.keyAlias")
+            val aliasPass = System.getenv("KEY_PASSWORD") ?: keystoreProperties.getProperty("release.keyPassword")
+
+            if (!keyPath.isNullOrEmpty() && file(keyPath).exists()) {
+                storeFile = file(keyPath)
+                storePassword = keyPass
+                keyAlias = alias
+                keyPassword = aliasPass
+            }
+        }
     }
 
     buildTypes {
@@ -27,8 +49,28 @@ android {
             isShrinkResources = false
         }
         release {
-            isMinifyEnabled = false
-            isShrinkResources = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+            val releaseSigning = signingConfigs.findByName("release")
+            if (releaseSigning?.storeFile != null && releaseSigning.storeFile!!.exists()) {
+                signingConfig = releaseSigning
+            }
+        }
+    }
+
+    bundle {
+        language {
+            enableSplit = false // Keeps Arabic and English bundled for offline in-app language switching
+        }
+        density {
+            enableSplit = true
+        }
+        abi {
+            enableSplit = true
         }
     }
 

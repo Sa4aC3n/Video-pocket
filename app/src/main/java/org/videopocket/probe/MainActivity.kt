@@ -337,6 +337,7 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var processingUri by rememberSaveable { mutableStateOf<String?>(null) }
     var processingTitle by rememberSaveable { mutableStateOf<String?>(null) }
+    var showPocketBeamGlobal by rememberSaveable { mutableStateOf(false) }
     val arabic = AppSettings.isArabic
     fun t(en: String, ar: String) = if (arabic) ar else en
 
@@ -407,6 +408,15 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                                     text = if (arabic) "English" else "العربية",
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            // Pocket Beam Local WiFi Transfer Icon
+                            IconButton(onClick = { showPocketBeamGlobal = true }) {
+                                Icon(
+                                    imageVector = Icons.Default.Bolt,
+                                    contentDescription = t("Pocket Beam", "النقل الفضائي"),
+                                    tint = MaterialTheme.colorScheme.primary
                                 )
                             }
 
@@ -508,6 +518,17 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                         }
                     }
                 }
+            }
+
+            if (showPocketBeamGlobal) {
+                PocketBeamDialog(
+                    libraryItems = model.libraryItems,
+                    arabic = arabic,
+                    onDismiss = {
+                        showPocketBeamGlobal = false
+                        model.refreshLibrary()
+                    }
+                )
             }
         }
     }

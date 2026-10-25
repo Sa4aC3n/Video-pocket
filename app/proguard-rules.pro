@@ -64,6 +64,7 @@
 -keep class org.videopocket.probe.vault.** { *; }
 -keep class org.videopocket.probe.sponsorblock.** { *; }
 -keep class org.videopocket.probe.floating.** { *; }
+-keep class org.videopocket.probe.beam.** { *; }
 
 # R8 default passes (do not force multi-pass optimization in constrained CI/Cloud environments)
 

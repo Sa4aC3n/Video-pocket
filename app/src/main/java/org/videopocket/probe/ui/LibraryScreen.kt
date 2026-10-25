@@ -1,9 +1,11 @@
 package org.videopocket.probe.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -49,6 +51,9 @@ fun LibraryScreen(
     var delete by remember { mutableStateOf<PocketLibraryItem?>(null) }
     var editCollections by remember { mutableStateOf<PocketLibraryItem?>(null) }
     var playingItem by remember { mutableStateOf<PocketLibraryItem?>(null) }
+    var beamItem by remember { mutableStateOf<PocketLibraryItem?>(null) }
+    var showPocketBeamDialog by remember { mutableStateOf(false) }
+
     val all = model.libraryItems
     val collections = remember(all) { all.flatMap { it.collections }.distinct().sorted() }
     val filtered = remember(all, query, filter, sort, collection) {
@@ -69,6 +74,59 @@ fun LibraryScreen(
         if (model.libraryError || model.libraryActionError) item {
             Text(t("Library action failed. Existing records have been kept. Check storage and file access.", "تعذرت عملية المكتبة مع الاحتفاظ بالسجلات الموجودة. راجع المساحة وصلاحية الوصول للملفات."), color = MaterialTheme.colorScheme.error)
         }
+
+        // Pocket Beam Local WiFi Transfer Card
+        item {
+            Card(
+                onClick = {
+                    beamItem = null
+                    showPocketBeamDialog = true
+                },
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.5f))
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.primary),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = t("Pocket Beam ⚡ (WiFi P2P)", "النقل الفضائي ⚡ (بدون إنترنت)"),
+                            fontWeight = FontWeight.Bold,
+                            style = MaterialTheme.typography.titleSmall
+                        )
+                        Text(
+                            text = t("Ultra-fast 70MB/s local transfer & QR sharing", "مشاركة فورية بسرعة 70 ميجابايت/ثانية بالواي فاي ورمز QR"),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                    }
+                    Icon(
+                        imageVector = Icons.Default.ChevronRight,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                }
+            }
+        }
+
+        // Encrypted Vault Card
         item {
             Card(
                 onClick = onNavigateVault,
@@ -143,12 +201,36 @@ fun LibraryScreen(
             TextButton(onClick = onNavigateHome) { Text(t("Add a download", "إضافة تنزيل")) }
         }
         items(filtered, key = { it.id }) { item ->
-            PocketItemCard(item, arabic,
-                onPlay = { playingItem = item }, onShare = { PocketLibraryManager.shareItem(context, item) },
-                onToggleFavorite = { model.toggleFavorite(item.id) }, onRename = { rename = item }, onDelete = { delete = item },
-                onProcess = { onProcess(item) }, onCollections = { editCollections = item })
+            PocketItemCard(
+                item = item,
+                arabic = arabic,
+                onPlay = { playingItem = item },
+                onShare = { PocketLibraryManager.shareItem(context, item) },
+                onBeam = {
+                    beamItem = item
+                    showPocketBeamDialog = true
+                },
+                onToggleFavorite = { model.toggleFavorite(item.id) },
+                onRename = { rename = item },
+                onDelete = { delete = item },
+                onProcess = { onProcess(item) },
+                onCollections = { editCollections = item }
+            )
         }
     }
+
+    if (showPocketBeamDialog) {
+        PocketBeamDialog(
+            initialItem = beamItem,
+            libraryItems = all,
+            arabic = arabic,
+            onDismiss = { showPocketBeamDialog = false },
+            onPlayReceived = { uri, name ->
+                model.playMedia(uri, name)
+            }
+        )
+    }
+
     playingItem?.let { item ->
         BuiltInPlayerDialog(
             item = item,
@@ -186,6 +268,7 @@ fun PocketItemCard(
     arabic: Boolean,
     onPlay: () -> Unit,
     onShare: () -> Unit,
+    onBeam: () -> Unit = {},
     onToggleFavorite: () -> Unit,
     onRename: () -> Unit,
     onDelete: () -> Unit,
@@ -335,6 +418,15 @@ fun PocketItemCard(
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
+                    // Quick Beam button
+                    IconButton(onClick = onBeam) {
+                        Icon(
+                            imageVector = Icons.Default.Bolt,
+                            contentDescription = t("Pocket Beam", "النقل الفضائي"),
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                    }
+
                     IconButton(onClick = onShare) {
                         Icon(Icons.Default.Share, contentDescription = t("Share", "مشاركة"))
                     }
@@ -347,6 +439,11 @@ fun PocketItemCard(
                             expanded = expandedMenu,
                             onDismissRequest = { expandedMenu = false }
                         ) {
+                            DropdownMenuItem(
+                                text = { Text(t("Pocket Beam ⚡", "إرسال فضائي ⚡")) },
+                                leadingIcon = { Icon(Icons.Default.Bolt, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                                onClick = { expandedMenu = false; onBeam() }
+                            )
                             DropdownMenuItem(
                                 text = { Text(t("Compress / edit", "ضغط / تعديل")) },
                                 leadingIcon = { Icon(Icons.Default.Tune, contentDescription = null) },

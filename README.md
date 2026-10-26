@@ -41,6 +41,21 @@ node scripts/check-native.mjs app/build/outputs/apk/release/app-release-unsigned
 
 The `Android verification` workflow runs on `main` and uploads Gradle reports, APKs, device-test results, screenshots and emulator startup/memory evidence on API 29 and API 36. Release APKs are unsigned. Install debug builds only for testing; updates to an existing installation require the same signing key.
 
+
+# Privacy Policy for CamScanner / PDF Shop
+
+Last updated: October 2026
+
+CamScanner / PDF Shop is built as an offline-first productivity tool. We respect your privacy and are committed to protecting it:
+
+1. No Internet Access: Our application does NOT request or use the `android.permission.INTERNET` permission. The app is completely offline.
+2. Local Processing: All PDF operations (compression, merging, splitting, card scanning, passport MRZ scanning, and offline OCR) take place 100% locally on your device.
+3. No Data Collection: We do not collect, transmit, store, or share any personal documents, images, biometric data, or analytics with any third party or remote server.
+4. Device Permissions: 
+   - Camera permission is requested strictly at runtime when capturing documents/cards, and frames are processed exclusively in device memory.
+   - Biometric authentication (if enabled) is handled securely by the Android OS hardware keystore and never accessed by the app.
+  
+   - 
 ## العربية
 
 اختر رابطًا عامًا للفحص والتنزيل، أو افتح **استوديو الوسائط** لاختيار ملف من الجهاز وضغطه أو قصه أو استخراج صوته أو تحويله. تُعرض الجودات الفعلية والتنسيقات التي اجتازت فحص المحرك. تبقى الملفات الأصلية محفوظة.

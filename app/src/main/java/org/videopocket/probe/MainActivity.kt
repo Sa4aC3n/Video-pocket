@@ -378,64 +378,86 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                                     containerColor = MaterialTheme.colorScheme.primaryContainer,
                                     contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                                 ) {
-                                    Text("3.0", modifier = Modifier.padding(2.dp), fontWeight = FontWeight.Bold)
+                                    Text("3.0", modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp), fontWeight = FontWeight.Bold, softWrap = false)
                                 }
                             }
                         },
                         actions = {
-                            // Instant 1-tap Theme Switcher (Light / Dark)
-                            val isDark = when (AppSettings.themeMode) {
-                                ThemeMode.SYSTEM -> isSystemInDarkTheme()
-                                ThemeMode.LIGHT -> false
-                                ThemeMode.DARK -> true
-                            }
-                            IconButton(onClick = {
-                                AppSettings.setTheme(if (isDark) ThemeMode.LIGHT else ThemeMode.DARK)
-                            }) {
-                                Icon(
-                                    imageVector = if (isDark) Icons.Default.LightMode else Icons.Default.DarkMode,
-                                    contentDescription = t("Toggle Theme", "تبديل المظهر"),
-                                    tint = if (isDark) Color(0xFFFBBF24) else MaterialTheme.colorScheme.primary
-                                )
-                            }
-
-                            // Instant 1-tap Language Switcher
-                            TextButton(
-                                onClick = { AppSettings.setLanguage(!arabic) },
-                                shape = RoundedCornerShape(12.dp)
+                            Row(
+                                horizontalArrangement = Arrangement.spacedBy(4.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                Text(
-                                    text = if (arabic) "English" else "العربية",
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
-                            }
+                                // 1. Settings (⚙️)
+                                IconButton(
+                                    onClick = { selectedTab = 3 },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Settings,
+                                        contentDescription = t("Settings", "الإعدادات"),
+                                        modifier = Modifier.size(20.dp),
+                                        tint = if (selectedTab == 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
 
-                            // Pocket Beam Local WiFi Transfer Icon
-                            IconButton(onClick = { showPocketBeamGlobal = true }) {
-                                Icon(
-                                    imageVector = Icons.Default.Bolt,
-                                    contentDescription = t("Pocket Beam", "النقل الفضائي"),
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                            }
+                                // 2. Encrypted Vault (🔒)
+                                IconButton(
+                                    onClick = { selectedTab = 7 },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = t("Vault", "الخزنة المشفرة"),
+                                        modifier = Modifier.size(20.dp),
+                                        tint = if (selectedTab == 7) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
 
-                            // Biometric Encrypted Vault Icon
-                            IconButton(onClick = { selectedTab = 7 }) {
-                                Icon(
-                                    imageVector = Icons.Default.Lock,
-                                    contentDescription = t("Vault", "الخزنة المشفرة"),
-                                    tint = if (selectedTab == 7) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                            }
+                                // 3. Pocket Beam Local WiFi Transfer (⚡)
+                                IconButton(
+                                    onClick = { showPocketBeamGlobal = true },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Bolt,
+                                        contentDescription = t("Pocket Beam", "النقل الفضائي"),
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
 
-                            // Quick Settings Navigation Icon
-                            IconButton(onClick = { selectedTab = 3 }) {
-                                Icon(
-                                    imageVector = Icons.Default.Settings,
-                                    contentDescription = t("Settings", "الإعدادات"),
-                                    tint = if (selectedTab == 3) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+                                // 4. Instant 1-tap Language Switcher (🌐)
+                                IconButton(
+                                    onClick = { AppSettings.setLanguage(!arabic) },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Language,
+                                        contentDescription = t("Toggle Language", "تبديل اللغة"),
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
+                                // 5. Instant 1-tap Theme Switcher (☀️ / 🌙)
+                                val isDark = when (AppSettings.themeMode) {
+                                    ThemeMode.SYSTEM -> isSystemInDarkTheme()
+                                    ThemeMode.LIGHT -> false
+                                    ThemeMode.DARK -> true
+                                }
+                                IconButton(
+                                    onClick = {
+                                        AppSettings.setTheme(if (isDark) ThemeMode.LIGHT else ThemeMode.DARK)
+                                    },
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = if (isDark) Icons.Default.LightMode else Icons.Default.DarkMode,
+                                        contentDescription = t("Toggle Theme", "تبديل المظهر"),
+                                        modifier = Modifier.size(20.dp),
+                                        tint = if (isDark) Color(0xFFFBBF24) else MaterialTheme.colorScheme.primary
+                                    )
+                                }
                             }
                         },
                         colors = TopAppBarDefaults.topAppBarColors(

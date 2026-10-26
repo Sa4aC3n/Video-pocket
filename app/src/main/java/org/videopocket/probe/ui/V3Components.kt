@@ -1,8 +1,12 @@
 package org.videopocket.probe.ui
 
+import android.app.Activity
+import android.app.PictureInPictureParams
 import android.content.Context
 import android.media.MediaPlayer
 import android.net.Uri
+import android.os.Build
+import android.util.Rational
 import android.widget.FrameLayout
 import android.widget.VideoView
 import androidx.compose.animation.*
@@ -682,6 +686,17 @@ fun BuiltInPlayerDialog(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
                     )
+                    IconButton(onClick = {
+                        val activity = context as? Activity
+                        if (activity != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            val params = PictureInPictureParams.Builder()
+                                .setAspectRatio(Rational(16, 9))
+                                .build()
+                            activity.enterPictureInPictureMode(params)
+                        }
+                    }) {
+                        Icon(Icons.Default.PictureInPictureAlt, contentDescription = "PiP", tint = Color.White)
+                    }
                     IconButton(onClick = { PocketLibraryManager.shareItem(context, item) }) {
                         Icon(Icons.Default.Share, contentDescription = null, tint = Color.White)
                     }

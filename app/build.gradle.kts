@@ -41,7 +41,7 @@ android {
 
             val envPass: String? = System.getenv("KEYSTORE_PASSWORD")
             val propPass: String? = keystoreProperties.getProperty("release.keystorePassword")
-            val keyPass = envPass ?: propPass ?: "videopocket"
+            val keyPass = envPass ?: propPass ?: "VideoPocket2026!"
 
             val envAlias: String? = System.getenv("KEY_ALIAS")
             val propAlias: String? = keystoreProperties.getProperty("release.keyAlias")
@@ -133,3 +133,14 @@ dependencies {
 }
 
 android { testOptions { unitTests.isIncludeAndroidResources = true } }
+
+tasks.matching { it.name == "bundleRelease" }.configureEach {
+    doLast {
+        val bundleDir = file("build/outputs/bundle/release")
+        val aab = File(bundleDir, "app-release.aab")
+        val unsignedAab = File(bundleDir, "app-release-unsigned.aab")
+        if (!aab.exists() && unsignedAab.exists()) {
+            unsignedAab.copyTo(aab, overwrite = true)
+        }
+    }
+}

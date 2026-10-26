@@ -15,56 +15,60 @@
 
 # ── General Android / Kotlin ──────────────────────────────────────────────────
 
-# Keep all entry points (Activities, Services, BroadcastReceivers, etc.)
+# Keep all component entry points for Android OS instantiation
 -keep public class * extends android.app.Activity
+-keep public class * extends android.app.Service
 -keep public class * extends android.app.Application
 -keep public class * extends android.content.BroadcastReceiver
 -keep public class * extends android.content.ContentProvider
 
-# Kotlin metadata (needed for reflection, serialization, coroutines)
+# Kotlin metadata & attributes
 -keepattributes *Annotation*, Signature, InnerClasses, EnclosingMethod
--keep class kotlin.Metadata { *; }
--keep class kotlin.reflect.** { *; }
 -dontwarn kotlin.reflect.**
 
-# Kotlin coroutines
--keepclassmembers class kotlinx.coroutines.** { *; }
--dontwarn kotlinx.coroutines.**
+# ── Video Pocket: JSON / Data Serialization Models ───────────────────────────
+# Keep data fields and constructors for Jackson / JSONObject parsing while
+# allowing all UI, business logic, and engines to be aggressively obfuscated.
 
-# ── Jetpack Compose ───────────────────────────────────────────────────────────
-
-# Compose compiler plugin generates synthetic classes; keep their structure.
--keep class androidx.compose.** { *; }
--keepclassmembers class * {
-    @androidx.compose.runtime.Composable <methods>;
-}
--dontwarn androidx.compose.**
-
-# ── ViewModel / Lifecycle ─────────────────────────────────────────────────────
-
--keep class androidx.lifecycle.** { *; }
--keepclassmembers class * extends androidx.lifecycle.ViewModel {
+-keepclassmembers class * implements java.io.Serializable {
+    static final long serialVersionUID;
+    private static final java.io.ObjectStreamField[] serialPersistentFields;
+    !static !transient <fields>;
+    !private <fields>;
+    !static !transient <methods>;
+    !private <methods>;
     <init>(...);
 }
 
-# ── Video Pocket: App Models ──────────────────────────────────────────────────
-# Keep all data classes and enums used for JSON persistence and state.
+-keepclassmembers enum * {
+    public static **[] values();
+    public static ** valueOf(java.lang.String);
+}
 
--keep class org.videopocket.probe.core.** { *; }
--keep class org.videopocket.probe.download.DownloadTask { *; }
--keep class org.videopocket.probe.download.DownloadState { *; }
--keep class org.videopocket.probe.idm.** { *; }
--keep class org.videopocket.probe.torrent.** { *; }
--keep class org.videopocket.probe.processing.ProcessingRequest { *; }
--keep class org.videopocket.probe.processing.ProcessingCapabilities { *; }
--keep class org.videopocket.probe.processing.CompressionPreset { *; }
--keep class org.videopocket.probe.processing.ProcessingMode { *; }
--keep class org.videopocket.probe.resolver.** { *; }
--keep class org.videopocket.probe.engine.** { *; }
--keep class org.videopocket.probe.vault.** { *; }
--keep class org.videopocket.probe.sponsorblock.** { *; }
--keep class org.videopocket.probe.floating.** { *; }
--keep class org.videopocket.probe.beam.** { *; }
+-keepclassmembers class org.videopocket.probe.core.** {
+    <init>(...);
+    <fields>;
+}
+
+-keepclassmembers class org.videopocket.probe.resolver.** {
+    <init>(...);
+    <fields>;
+}
+
+-keepclassmembers class org.videopocket.probe.sponsorblock.** {
+    <init>(...);
+    <fields>;
+}
+
+-keepclassmembers class org.videopocket.probe.vault.VaultItem {
+    <init>(...);
+    <fields>;
+}
+
+-keepclassmembers class org.videopocket.probe.download.DownloadTask {
+    <init>(...);
+    <fields>;
+}
 
 # R8 default passes (do not force multi-pass optimization in constrained CI/Cloud environments)
 

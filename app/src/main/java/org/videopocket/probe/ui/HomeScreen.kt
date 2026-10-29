@@ -53,6 +53,9 @@ fun HomeScreen(
     var selectedBitrate by remember { mutableIntStateOf(192) }
     var videoFormat by rememberSaveable { mutableStateOf(AppSettings.defaultVideoFormat) }
     var audioFormat by rememberSaveable { mutableStateOf(AppSettings.defaultAudioFormat) }
+    var selectedAudioTrackId by rememberSaveable(model.info?.id) {
+        mutableStateOf(model.info?.audioTracks?.firstOrNull { it.isOriginal }?.id ?: model.info?.audioTracks?.firstOrNull()?.id)
+    }
 
     var showSupportedSources by remember { mutableStateOf(false) }
     var showBatchDownload by remember { mutableStateOf(false) }
@@ -104,6 +107,7 @@ fun HomeScreen(
     LaunchedEffect(model.info) {
         sponsorSegments.clear()
         model.info?.let {
+            selectedAudioTrackId = it.audioTracks.firstOrNull { t -> t.isOriginal }?.id ?: it.audioTracks.firstOrNull()?.id
             val vidId = it.id ?: SponsorBlockClient.extractVideoId(model.inspectedUrl)
             if (vidId != null) {
                 val list = SponsorBlockClient.getSegments(vidId)
@@ -623,6 +627,54 @@ fun HomeScreen(
                         }
                     }
 
+                    if (media.audioTracks.size > 1) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.RecordVoiceOver,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        t("Audio Language / Dub:", "لغة الصوت / الدبلجة:"),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    media.audioTracks.forEach { track ->
+                                        val isSel = (selectedAudioTrackId == track.id) || (selectedAudioTrackId == null && track.isOriginal)
+                                        FilterChip(
+                                            selected = isSel,
+                                            onClick = { selectedAudioTrackId = track.id },
+                                            label = {
+                                                Text(
+                                                    if (track.isOriginal) "${track.displayName} (${t("Original", "الأصلية")})"
+                                                    else track.displayName
+                                                )
+                                            },
+                                            leadingIcon = if (isSel) {
+                                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                            } else null
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Quick Download and Custom Options row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -632,7 +684,7 @@ fun HomeScreen(
                             onClick = {
                                 triggerDownloadWithDuplicateCheck {
                                     val action = if (media.isPlaylist) ProbeAction.PLAYLIST_VIDEO else ProbeAction.VIDEO
-                                    model.run(action, selectedHeight, selectedBitrate, videoFormat, removeSponsors = cleanDownloadWithoutSponsors)
+                                    model.run(action, selectedHeight, selectedBitrate, videoFormat, removeSponsors = cleanDownloadWithoutSponsors, selectedAudioTrackId = selectedAudioTrackId)
                                 }
                             },
                             enabled = !model.busy,
@@ -766,7 +818,7 @@ fun HomeScreen(
                                 Button(
                                     onClick = {
                                         triggerDownloadWithDuplicateCheck {
-                                            model.run(ProbeAction.VIDEO, selectedHeight, selectedBitrate, videoFormat, removeSponsors = cleanDownloadWithoutSponsors)
+                                            model.run(ProbeAction.VIDEO, selectedHeight, selectedBitrate, videoFormat, removeSponsors = cleanDownloadWithoutSponsors, selectedAudioTrackId = selectedAudioTrackId)
                                         }
                                     },
                                     enabled = !model.busy,
@@ -833,7 +885,7 @@ fun HomeScreen(
                                 Button(
                                     onClick = {
                                         triggerDownloadWithDuplicateCheck {
-                                            model.run(ProbeAction.MP3, selectedHeight, selectedBitrate, removeSponsors = cleanDownloadWithoutSponsors)
+                                            model.run(ProbeAction.MP3, selectedHeight, selectedBitrate, removeSponsors = cleanDownloadWithoutSponsors, selectedAudioTrackId = selectedAudioTrackId)
                                         }
                                     },
                                     enabled = !model.busy,
@@ -992,13 +1044,15 @@ fun HomeScreen(
             normalized = model.normalizedMetadata,
             initialHeight = selectedHeight,
             initialFormat = videoFormat,
+            initialAudioTrackId = selectedAudioTrackId,
             arabic = arabic,
             onDismiss = { showDownloadOptionsSheet = false },
-            onConfirmDownload = { height, fmt ->
+            onConfirmDownload = { height, fmt, trackId ->
                 selectedHeight = height
                 videoFormat = fmt
+                if (trackId != null) selectedAudioTrackId = trackId
                 triggerDownloadWithDuplicateCheck {
-                    model.run(ProbeAction.VIDEO, height, selectedBitrate, fmt)
+                    model.run(ProbeAction.VIDEO, height, selectedBitrate, fmt, removeSponsors = cleanDownloadWithoutSponsors, selectedAudioTrackId = trackId ?: selectedAudioTrackId)
                 }
             }
         )

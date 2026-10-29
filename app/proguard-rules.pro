@@ -144,3 +144,12 @@
 # ── Debugging: keep source file names and line numbers in stack traces ─────────
 -keepattributes SourceFile, LineNumberTable
 -renamesourcefileattribute SourceFile
+
+# ── Google Mobile Ads (AdMob) ─────────────────────────────────────────────────
+-keep public class com.google.android.gms.ads.** {
+   public *;
+}
+-keep public class com.google.ads.** {
+   public *;
+}
+-dontwarn com.google.android.gms.ads.**

@@ -14,7 +14,10 @@ data class MediaFormat(
     val bytes: Long?,
     val url: String? = null,
     val videoKnown: Boolean = true,
-    val audioKnown: Boolean = true
+    val audioKnown: Boolean = true,
+    val language: String? = null,
+    val isOriginalAudio: Boolean = false,
+    val formatNote: String? = null
 )
 data class PlaylistEntry(val id: String, val title: String, val duration: Double? = null, val url: String? = null)
 data class SubtitleTrack(
@@ -23,6 +26,13 @@ data class SubtitleTrack(
     val ext: String,
     val url: String,
     val isAuto: Boolean = false
+)
+
+data class MediaAudioTrack(
+    val id: String,
+    val languageCode: String,
+    val displayName: String,
+    val isOriginal: Boolean
 )
 
 data class MediaInfo(
@@ -37,7 +47,8 @@ data class MediaInfo(
     val uploader: String? = null,
     val extractor: String? = null,
     val subtitles: List<SubtitleTrack> = emptyList(),
-    val id: String? = null
+    val id: String? = null,
+    val audioTracks: List<MediaAudioTrack> = emptyList()
 ) {
     val heights get() = formats.filter { it.video && it.height > 0 }.map { it.height }.distinct().sortedDescending()
     val defaultHeight get() = heights.firstOrNull { it <= 1080 } ?: heights.minOrNull() ?: 0
@@ -189,12 +200,24 @@ object LinkPolicy {
 
 object FormatPolicy {
     // No fallback to a lower resolution: make a missing requested format visible.
-    fun select(info: MediaInfo, action: ProbeAction, height: Int): String {
+    fun select(info: MediaInfo, action: ProbeAction, height: Int, preferredAudioId: String? = null): String {
         fun safe(id: String): String {
             if (!id.matches(Regex("[A-Za-z0-9_.-]+"))) throw ProbeFailure(Problem.UNSUPPORTED)
             return id
         }
-        val audio = info.formats.filter { it.audio && !it.video && it.videoKnown }.maxByOrNull { it.bytes ?: 0 }
+        val allAudio = info.formats.filter { it.audio && !it.video && it.videoKnown }
+        val audio = if (!preferredAudioId.isNullOrBlank()) {
+            allAudio.firstOrNull { it.id == preferredAudioId } ?: allAudio.maxByOrNull { it.bytes ?: 0 }
+        } else {
+            val originals = allAudio.filter {
+                it.isOriginalAudio ||
+                it.formatNote?.contains("original", ignoreCase = true) == true ||
+                it.language == "orig" ||
+                (!it.id.contains("-") && it.formatNote?.contains("dub", ignoreCase = true) != true)
+            }
+            if (originals.isNotEmpty()) originals.maxByOrNull { it.bytes ?: 0 }
+            else allAudio.maxByOrNull { it.bytes ?: 0 }
+        }
         val videos = info.formats.filter { (it.video || !it.videoKnown) && it.height == height }
         return when (action) {
             ProbeAction.INSPECT -> "best"
@@ -206,15 +229,15 @@ object FormatPolicy {
             }
             ProbeAction.VIDEO -> {
                 val combined = videos.lastOrNull { it.audio }
-                if (combined != null) safe(combined.id)
+                if (combined != null && (preferredAudioId.isNullOrBlank() || combined.id == preferredAudioId)) safe(combined.id)
                 else {
                     val video = videos.lastOrNull() ?: throw ProbeFailure(Problem.UNSUPPORTED)
                     if (audio != null) safe(video.id) + "+" + safe(audio.id) else safe(video.id)
                 }
             }
-            ProbeAction.PLAYLIST_VIDEO -> "bestvideo[height<=$height]+bestaudio/best[height<=$height]/best"
-            ProbeAction.PLAYLIST_MP3 -> "bestaudio/best"
-            ProbeAction.CLIP -> if (height == 0) "bestvideo+bestaudio/best" else "bestvideo[height<=$height]+bestaudio/best[height<=$height]/best"
+            ProbeAction.PLAYLIST_VIDEO -> if (height == 0) "bestvideo+bestaudio[format_note*=original]/bestvideo+bestaudio/best" else "bestvideo[height<=$height]+bestaudio[format_note*=original]/bestvideo[height<=$height]+bestaudio/best"
+            ProbeAction.PLAYLIST_MP3 -> "bestaudio[format_note*=original]/bestaudio/best"
+            ProbeAction.CLIP -> if (height == 0) "bestvideo+bestaudio[format_note*=original]/bestvideo+bestaudio/best" else "bestvideo[height<=$height]+bestaudio[format_note*=original]/bestvideo[height<=$height]+bestaudio/best"
         }
     }
 }

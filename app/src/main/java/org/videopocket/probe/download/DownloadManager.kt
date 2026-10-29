@@ -70,7 +70,8 @@ data class DownloadTask(
     val canResume: Boolean = false,
     val elapsedMs: Long? = null,
     val validationDetail: String? = null,
-    val removeSponsors: Boolean = false
+    val removeSponsors: Boolean = false,
+    val selectedAudioTrackId: String? = null
 )
 
 /**
@@ -305,7 +306,8 @@ class DownloadQueueManager(
                         task.bitrate,
                         if (task.isAudioOnly) "auto" else task.format,
                         progress,
-                        removeSponsors = task.removeSponsors
+                        removeSponsors = task.removeSponsors,
+                        selectedAudioTrackId = task.selectedAudioTrackId
                     )
                 }
                 check(downloaded.passed && !downloaded.outputUri.isNullOrBlank())

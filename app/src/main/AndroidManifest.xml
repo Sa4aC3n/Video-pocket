@@ -27,6 +27,11 @@
         android:enableOnBackInvokedCallback="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
+        <!-- Google AdMob Application ID -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-5797893761930988~5714171653" />
+
         <activity
             android:name=".MainActivity"
             android:exported="true"

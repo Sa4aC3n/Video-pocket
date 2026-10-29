@@ -1,4 +1,4 @@
-﻿package org.videopocket.probe.download
+package org.videopocket.probe.download
 
 import android.content.Context
 import android.util.AtomicFile
@@ -29,7 +29,8 @@ class QueueStore(context: Context) {
                 outputUri = json.optString("outputUri").ifBlank { null }, bytes = json.optLong("bytes"),
                 elapsedMs = if (json.has("elapsedMs") && !json.isNull("elapsedMs")) json.getLong("elapsedMs").takeIf { it >= 0 } else null,
                 validationDetail = json.optString("validationDetail").takeIf { it.isNotBlank() && it != "null" },
-                createdAt = json.optLong("createdAt"), progress = if (savedState == DownloadState.COMPLETED) 100f else -1f)
+                createdAt = json.optLong("createdAt"), progress = if (savedState == DownloadState.COMPLETED) 100f else -1f,
+                selectedAudioTrackId = json.optString("selectedAudioTrackId").ifBlank { null })
         }
     }
     fun save(tasks: List<DownloadTask>) {
@@ -41,6 +42,7 @@ class QueueStore(context: Context) {
                 put("audio", task.isAudioOnly); put("state", task.state.name); put("error", task.error ?: "")
                 put("outputUri", task.outputUri ?: ""); put("bytes", task.bytes); put("createdAt", task.createdAt)
                 put("elapsedMs", task.elapsedMs ?: JSONObject.NULL); put("validationDetail", task.validationDetail ?: JSONObject.NULL)
+                if (task.selectedAudioTrackId != null) put("selectedAudioTrackId", task.selectedAudioTrackId)
                 task.clipRequest?.let { clip -> put("clip", JSONObject().apply {
                     put("start", clip.startSeconds); put("end", clip.endSeconds); put("height", clip.height)
                     put("format", clip.format); put("best", clip.isBestQuality); put("audio", clip.isAudioOnly)

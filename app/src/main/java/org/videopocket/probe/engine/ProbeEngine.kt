@@ -219,15 +219,47 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             val videoCodec = codec("vcodec")
             val audioCodec = codec("acodec")
             val reportedHeight = f.optInt("height", 0).coerceAtLeast(0)
+            val lang = f.optString("language").takeIf { it.isNotBlank() && it != "null" }
+            val note = f.optString("format_note").takeIf { it.isNotBlank() && it != "null" }
+            val formatId = f.optString("format_id", "best").ifBlank { "best" }
+            val isOriginal = note?.contains("original", ignoreCase = true) == true ||
+                lang == "orig" ||
+                f.optInt("language_preference", 0) > 0 ||
+                (!formatId.contains("-") && note?.contains("dub", ignoreCase = true) != true)
             org.videopocket.probe.core.MediaFormat(
-                f.optString("format_id", "best").ifBlank { "best" }, f.optString("ext"), reportedHeight,
+                formatId, f.optString("ext"), reportedHeight,
                 reportedHeight > 0 || videoCodec != null && videoCodec != "none", audioCodec != null && audioCodec != "none",
                 f.optLong("filesize", f.optLong("filesize_approx", 0)).takeIf { it > 0 },
                 f.optString("url").takeIf { it.isNotBlank() },
-                videoKnown = reportedHeight > 0 || videoCodec != null, audioKnown = audioCodec != null
+                videoKnown = reportedHeight > 0 || videoCodec != null, audioKnown = audioCodec != null,
+                language = lang,
+                isOriginalAudio = isOriginal,
+                formatNote = note
             )
         }
         if (formats.isEmpty()) throw ProbeFailure(Problem.UNSUPPORTED)
+
+        val audioFormats = formats.filter { it.audio && !it.video && it.audioKnown }
+        val audioTracks = mutableListOf<org.videopocket.probe.core.MediaAudioTrack>()
+        val seenLangs = mutableSetOf<String>()
+        val origTrack = audioFormats.firstOrNull { it.isOriginalAudio } ?: audioFormats.firstOrNull()
+        if (origTrack != null) {
+            val code = origTrack.language ?: "orig"
+            val display = if (code == "orig") "Original Audio" else {
+                runCatching { java.util.Locale(code).getDisplayLanguage(java.util.Locale("ar")) }.getOrNull()?.takeIf { it.isNotBlank() } ?: java.util.Locale(code).displayLanguage.ifBlank { "Original Audio" }
+            }
+            audioTracks.add(org.videopocket.probe.core.MediaAudioTrack(origTrack.id, code, display, true))
+            seenLangs.add(code)
+        }
+        audioFormats.forEach { fmt ->
+            val code = fmt.language
+            if (!code.isNullOrBlank() && code !in seenLangs && code != "orig") {
+                seenLangs.add(code)
+                val display = runCatching { java.util.Locale(code).getDisplayLanguage(java.util.Locale("ar")) }.getOrNull()?.takeIf { it.isNotBlank() } ?: java.util.Locale(code).displayLanguage.ifBlank { code.uppercase() }
+                audioTracks.add(org.videopocket.probe.core.MediaAudioTrack(fmt.id, code, display, fmt.isOriginalAudio))
+            }
+        }
+
         val thumbnail = json.optString("thumbnail").takeIf { it.isNotBlank() }
             ?: json.optJSONArray("thumbnails")?.let { arr ->
                 if (arr.length() > 0) arr.optJSONObject(arr.length() - 1)?.optString("url") else null
@@ -270,14 +302,25 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             uploader = author,
             extractor = extractor,
             subtitles = subList,
-            id = mediaId
+            id = mediaId,
+            audioTracks = audioTracks
         )
     }
 
     override fun download(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, progress: (Float) -> Unit): ProbeResult =
         downloadWithFormat(url, info, action, height, bitrate, "auto", progress, false)
 
-    fun downloadWithFormat(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, outputFormat: String, progress: (Float) -> Unit, removeSponsors: Boolean = false): ProbeResult {
+    fun downloadWithFormat(
+        url: String,
+        info: MediaInfo,
+        action: ProbeAction,
+        height: Int,
+        bitrate: Int,
+        outputFormat: String,
+        progress: (Float) -> Unit,
+        removeSponsors: Boolean = false,
+        selectedAudioTrackId: String? = null
+    ): ProbeResult {
         require(outputFormat in setOf("auto", "mp4", "mkv", "webm"))
         initialize()
         require(action != ProbeAction.INSPECT)
@@ -286,7 +329,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         if (isPlaylist) {
             return downloadPlaylist(url, info, action, height, bitrate, outputFormat, progress, removeSponsors)
         }
-        val format = FormatPolicy.select(info, action, height)
+        val format = FormatPolicy.select(info, action, height, selectedAudioTrackId)
         val estimate = info.formats.filter { it.id in format.split('+') }.mapNotNull { it.bytes }.sum()
         if (StatFs(context.noBackupFilesDir.path).availableBytes < maxOf(256L * 1024 * 1024, estimate * 3))
             throw ProbeFailure(Problem.SPACE)
@@ -363,11 +406,11 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             val sectionArg = "*${startFormatted}-${endFormatted}"
 
             val formatStr = when {
-                clip.isAudioOnly -> "bestaudio/best"
-                clip.isBestQuality || clip.height == 0 -> "bestvideo+bestaudio/best"
+                clip.isAudioOnly -> "bestaudio[format_note*=original]/bestaudio/best"
+                clip.isBestQuality || clip.height == 0 -> "bestvideo+bestaudio[format_note*=original]/bestvideo+bestaudio/best"
                 else -> {
                     val targetH = if (info.heights.contains(clip.height)) clip.height else info.defaultHeight
-                    "bestvideo[height<=$targetH]+bestaudio/best[height<=$targetH]/best"
+                    "bestvideo[height<=$targetH]+bestaudio[format_note*=original]/bestvideo[height<=$targetH]/best"
                 }
             }
 
@@ -452,14 +495,15 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             }
 
             if (action == ProbeAction.MP3 || action == ProbeAction.PLAYLIST_MP3) {
-                req.addOption("-x")
+                req.addOption("--format", "bestaudio[format_note*=original]/bestaudio/best")
+                    .addOption("-x")
                     .addOption("--audio-format", "mp3")
                     .addOption("--audio-quality", "${bitrate}K")
                     .addOption("--embed-metadata")
                     .addOption("--embed-thumbnail")
                     .addOption("--convert-thumbnails", "jpg")
             } else {
-                req.addOption("--format", "bestvideo[height<=$height]+bestaudio/best[height<=$height]/best")
+                req.addOption("--format", "bestvideo[height<=$height]+bestaudio[format_note*=original]/bestvideo[height<=$height]+bestaudio/best[height<=$height]/best")
                     .addOption("--merge-output-format", if (outputFormat == "auto") "mkv" else outputFormat)
             }
 

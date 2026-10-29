@@ -39,6 +39,8 @@ import org.videopocket.probe.engine.PocketNotifier
 import org.videopocket.probe.engine.ProbeEngine
 import org.videopocket.probe.resolver.*
 import org.videopocket.probe.ui.*
+import org.videopocket.probe.ads.AdManager
+import org.videopocket.probe.ads.BannerAd
 import java.io.File
 import java.time.Instant
 import java.util.UUID
@@ -59,6 +61,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         AppSettings.init(this)
         FeatureFlagsManager.init(this)
+        AdManager.initialize(this)
 
         sharedText = if (intent?.action == Intent.ACTION_SEND) {
             LinkPolicy.extractUrl(intent.getStringExtra(Intent.EXTRA_TEXT))
@@ -271,7 +274,8 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
         height: Int,
         bitrate: Int,
         outputFormat: String = AppSettings.defaultVideoFormat,
-        removeSponsors: Boolean = AppSettings.sponsorBlockRemoveOnDownload
+        removeSponsors: Boolean = AppSettings.sponsorBlockRemoveOnDownload,
+        selectedAudioTrackId: String? = null
     ) {
         if (busy) return
         val media = info ?: return
@@ -281,7 +285,7 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
             platform = normalizedMetadata?.platform ?: media.extractor.orEmpty(),
             quality = if (audio) "${bitrate} kbps output" else if (height > 0) "${height}p" else "Source quality",
             format = if (audio) "mp3" else outputFormat, height = height, bitrate = bitrate, isAudioOnly = audio, rawInfo = media,
-            removeSponsors = removeSponsors))
+            removeSponsors = removeSponsors, selectedAudioTrackId = selectedAudioTrackId))
     }
 
     fun runClip(clip: ClipRequest) {
@@ -466,18 +470,23 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                     )
                 },
                 bottomBar = {
-                    if (!expanded) {
-                        NavigationBar(
-                            containerColor = MaterialTheme.colorScheme.surface,
-                            tonalElevation = 8.dp
-                        ) {
-                            destinations.forEach { (id, icon, label) ->
-                                NavigationBarItem(
-                                    selected = selectedTab == id,
-                                    onClick = { selectedTab = id },
-                                    icon = { Icon(icon, contentDescription = null) },
-                                    label = { Text(label, maxLines = 1, fontSize = 11.sp, fontWeight = if (selectedTab == id) FontWeight.Bold else FontWeight.Normal) }
-                                )
+                    Column {
+                        if (selectedTab != 7) {
+                            BannerAd()
+                        }
+                        if (!expanded) {
+                            NavigationBar(
+                                containerColor = MaterialTheme.colorScheme.surface,
+                                tonalElevation = 8.dp
+                            ) {
+                                destinations.forEach { (id, icon, label) ->
+                                    NavigationBarItem(
+                                        selected = selectedTab == id,
+                                        onClick = { selectedTab = id },
+                                        icon = { Icon(icon, contentDescription = null) },
+                                        label = { Text(label, maxLines = 1, fontSize = 11.sp, fontWeight = if (selectedTab == id) FontWeight.Bold else FontWeight.Normal) }
+                                    )
+                                }
                             }
                         }
                     }

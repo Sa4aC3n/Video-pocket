@@ -1,7 +1,6 @@
-﻿package org.videopocket.probe.ui
+package org.videopocket.probe.ui
 
-import androidx.compose.foundation.BorderStroke
-import androidx.compose.foundation.background
+import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -266,13 +265,17 @@ fun DownloadOptionsBottomSheet(
     normalized: NormalizedMetadata?,
     initialHeight: Int,
     initialFormat: String,
+    initialAudioTrackId: String? = null,
     arabic: Boolean,
     onDismiss: () -> Unit,
-    onConfirmDownload: (height: Int, format: String) -> Unit
+    onConfirmDownload: (height: Int, format: String, audioTrackId: String?) -> Unit
 ) {
     fun t(en: String, ar: String) = if (arabic) ar else en
     var selectedHeight by remember { mutableIntStateOf(initialHeight) }
     var selectedFormat by remember { mutableStateOf(initialFormat) }
+    var selectedAudioTrackId by remember {
+        mutableStateOf(initialAudioTrackId ?: media.audioTracks.firstOrNull { it.isOriginal }?.id ?: media.audioTracks.firstOrNull()?.id)
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -359,11 +362,39 @@ fun DownloadOptionsBottomSheet(
                 }
             }
 
+            if (media.audioTracks.size > 1) {
+                HorizontalDivider()
+                Text(
+                    text = t("Audio Language / Dub:", "لغة الصوت / الدبلجة:"),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    media.audioTracks.forEach { track ->
+                        val isSel = (selectedAudioTrackId == track.id) || (selectedAudioTrackId == null && track.isOriginal)
+                        FilterChip(
+                            selected = isSel,
+                            onClick = { selectedAudioTrackId = track.id },
+                            label = {
+                                Text(if (track.isOriginal) "${track.displayName} (${t("Original", "الأصلية")})" else track.displayName)
+                            },
+                            leadingIcon = if (isSel) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                            } else null
+                        )
+                    }
+                }
+            }
+
             Spacer(Modifier.height(8.dp))
 
             Button(
                 onClick = {
-                    onConfirmDownload(selectedHeight, selectedFormat)
+                    onConfirmDownload(selectedHeight, selectedFormat, selectedAudioTrackId)
                     onDismiss()
                 },
                 shape = RoundedCornerShape(16.dp),

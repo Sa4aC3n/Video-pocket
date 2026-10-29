@@ -1,0 +1,19 @@
+# Enforce Unix LF line endings for shell scripts and Gradle wrapper
+gradlew text eol=lf
+*.sh text eol=lf
+
+# Enforce Windows CRLF for Windows scripts
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Keep binary formats unchanged
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.jar binary
+*.so binary
+*.jks binary
+*.keystore binary
+*.aab binary
+*.apk binary

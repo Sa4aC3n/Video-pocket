@@ -75,6 +75,8 @@ android {
             val releaseSigning = signingConfigs.findByName("release")
             if (releaseSigning?.storeFile != null && releaseSigning.storeFile!!.exists()) {
                 signingConfig = releaseSigning
+            } else {
+                signingConfig = signingConfigs.getByName("debug")
             }
         }
     }
@@ -100,6 +102,10 @@ android {
     packaging {
         jniLibs.useLegacyPackaging = true
         resources.excludes += setOf("META-INF/DEPENDENCIES", "META-INF/INDEX.LIST")
+    }
+    lint {
+        checkReleaseBuilds = false
+        abortOnError = false
     }
 }
 

@@ -70,7 +70,9 @@
     <fields>;
 }
 
-# R8 default passes (do not force multi-pass optimization in constrained CI/Cloud environments)
+# Disable heavy bytecode optimization passes to prevent memory thrashing in memory-constrained environments
+# Full shrinking and symbol obfuscation (mapping.txt) remain 100% active.
+-dontoptimize
 
 # ── yt-dlp / youtubedl-android wrapper ───────────────────────────────────────
 # The wrapper uses reflection, JNI, and Apache Commons Compress to unpack binaries.

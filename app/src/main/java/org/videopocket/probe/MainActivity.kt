@@ -41,12 +41,39 @@ import org.videopocket.probe.resolver.*
 import org.videopocket.probe.ui.*
 import org.videopocket.probe.ads.AdManager
 import org.videopocket.probe.ads.BannerAd
+import android.app.PictureInPictureParams
+import android.content.res.Configuration
+import android.os.Build
+import android.util.Rational
+import androidx.activity.SystemBarStyle
 import java.io.File
 import java.time.Instant
 import java.util.UUID
 
 class MainActivity : ComponentActivity() {
     private var sharedText by mutableStateOf("")
+    private var isInPipMode by mutableStateOf(false)
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        enterPipMode()
+    }
+
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean, newConfig: Configuration) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        isInPipMode = isInPictureInPictureMode
+    }
+
+    fun enterPipMode() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val params = PictureInPictureParams.Builder()
+                    .setAspectRatio(Rational(16, 9))
+                    .build()
+                enterPictureInPictureMode(params)
+            } catch (_: Exception) {}
+        }
+    }
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
@@ -58,7 +85,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        enableEdgeToEdge()
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.auto(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT)
+        )
         AppSettings.init(this)
         FeatureFlagsManager.init(this)
         AdManager.initialize(this)
@@ -71,7 +101,11 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             VideoPocketTheme(themeMode = AppSettings.themeMode) {
-                MainContainer(sharedIntent = sharedText)
+                MainContainer(
+                    sharedIntent = sharedText,
+                    isInPipMode = isInPipMode,
+                    onEnterPip = { enterPipMode() }
+                )
             }
         }
     }
@@ -337,7 +371,12 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
+fun MainContainer(
+    sharedIntent: String,
+    model: ProbeModel = viewModel(),
+    isInPipMode: Boolean = false,
+    onEnterPip: () -> Unit = {}
+) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     var processingUri by rememberSaveable { mutableStateOf<String?>(null) }
     var processingTitle by rememberSaveable { mutableStateOf<String?>(null) }
@@ -359,8 +398,9 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
         BoxWithConstraints(Modifier.fillMaxSize()) {
             val expanded = maxWidth >= 840.dp
             Scaffold(
-                contentWindowInsets = WindowInsets.systemBars,
+                contentWindowInsets = if (isInPipMode) WindowInsets(0, 0, 0, 0) else WindowInsets.systemBars,
                 topBar = {
+                    if (!isInPipMode) {
                     TopAppBar(
                         title = {
                             Row(
@@ -430,6 +470,19 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                                     )
                                 }
 
+                                // 4. Picture-in-Picture Mode (📺)
+                                IconButton(
+                                    onClick = onEnterPip,
+                                    modifier = Modifier.size(36.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.PictureInPictureAlt,
+                                        contentDescription = t("Picture in Picture", "صورة داخل صورة"),
+                                        modifier = Modifier.size(20.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+
                                 // 4. Instant 1-tap Language Switcher (🌐)
                                 IconButton(
                                     onClick = { AppSettings.setLanguage(!arabic) },
@@ -468,24 +521,27 @@ fun MainContainer(sharedIntent: String, model: ProbeModel = viewModel()) {
                             containerColor = MaterialTheme.colorScheme.background
                         )
                     )
+                    }
                 },
                 bottomBar = {
-                    Column {
-                        if (selectedTab != 7) {
-                            BannerAd()
-                        }
-                        if (!expanded) {
-                            NavigationBar(
-                                containerColor = MaterialTheme.colorScheme.surface,
-                                tonalElevation = 8.dp
-                            ) {
-                                destinations.forEach { (id, icon, label) ->
-                                    NavigationBarItem(
-                                        selected = selectedTab == id,
-                                        onClick = { selectedTab = id },
-                                        icon = { Icon(icon, contentDescription = null) },
-                                        label = { Text(label, maxLines = 1, fontSize = 11.sp, fontWeight = if (selectedTab == id) FontWeight.Bold else FontWeight.Normal) }
-                                    )
+                    if (!isInPipMode) {
+                        Column {
+                            if (selectedTab != 7) {
+                                BannerAd()
+                            }
+                            if (!expanded) {
+                                NavigationBar(
+                                    containerColor = MaterialTheme.colorScheme.surface,
+                                    tonalElevation = 8.dp
+                                ) {
+                                    destinations.forEach { (id, icon, label) ->
+                                        NavigationBarItem(
+                                            selected = selectedTab == id,
+                                            onClick = { selectedTab = id },
+                                            icon = { Icon(icon, contentDescription = null) },
+                                            label = { Text(label, maxLines = 1, fontSize = 11.sp, fontWeight = if (selectedTab == id) FontWeight.Bold else FontWeight.Normal) }
+                                        )
+                                    }
                                 }
                             }
                         }

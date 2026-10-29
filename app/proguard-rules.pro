@@ -153,3 +153,8 @@
    public *;
 }
 -dontwarn com.google.android.gms.ads.**
+
+# ── DEX Code Optimization & Aggressive Obfuscation ───────────────────────────
+-repackageclasses 'org.videopocket.probe.o'
+-allowaccessmodification
+-overloadaggressively

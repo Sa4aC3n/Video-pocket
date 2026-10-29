@@ -309,7 +309,8 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
         bitrate: Int,
         outputFormat: String = AppSettings.defaultVideoFormat,
         removeSponsors: Boolean = AppSettings.sponsorBlockRemoveOnDownload,
-        selectedAudioTrackId: String? = null
+        selectedAudioTrackId: String? = null,
+        selectedSubtitleLang: String? = null
     ) {
         if (busy) return
         val media = info ?: return
@@ -319,7 +320,8 @@ class ProbeModel(application: Application) : AndroidViewModel(application) {
             platform = normalizedMetadata?.platform ?: media.extractor.orEmpty(),
             quality = if (audio) "${bitrate} kbps output" else if (height > 0) "${height}p" else "Source quality",
             format = if (audio) "mp3" else outputFormat, height = height, bitrate = bitrate, isAudioOnly = audio, rawInfo = media,
-            removeSponsors = removeSponsors, selectedAudioTrackId = selectedAudioTrackId))
+            removeSponsors = removeSponsors, selectedAudioTrackId = selectedAudioTrackId,
+            selectedSubtitleLang = selectedSubtitleLang))
     }
 
     fun runClip(clip: ClipRequest) {

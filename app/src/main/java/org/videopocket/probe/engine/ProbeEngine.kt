@@ -219,44 +219,96 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             val videoCodec = codec("vcodec")
             val audioCodec = codec("acodec")
             val reportedHeight = f.optInt("height", 0).coerceAtLeast(0)
-            val lang = f.optString("language").takeIf { it.isNotBlank() && it != "null" }
+            val rawLang = f.optString("language").takeIf { it.isNotBlank() && it != "null" && it != "und" }
+            val rawLangName = f.optString("language_name").takeIf { it.isNotBlank() && it != "null" }
             val note = f.optString("format_note").takeIf { it.isNotBlank() && it != "null" }
             val formatId = f.optString("format_id", "best").ifBlank { "best" }
+
+            var langCode: String? = rawLang?.takeIf { it != "orig" }
+            var langName: String? = rawLangName
+
+            if (langCode == null && !note.isNullOrBlank()) {
+                val candidate = if (note.contains(",")) note.substringAfter(",").trim() else note.trim()
+                val clean = candidate
+                    .replace(Regex("""\[.*?\]|\(.*?\)|dubbed|original|default""", RegexOption.IGNORE_CASE), "")
+                    .trim()
+                if (clean.isNotBlank()) {
+                    val lower = clean.lowercase()
+                    val mapped = KNOWN_LANG_MAP[lower]
+                    if (mapped != null) {
+                        langCode = mapped
+                        langName = clean
+                    } else if (clean.length in 2..3 && clean.all { it.isLetter() }) {
+                        langCode = clean.lowercase()
+                    } else if (!clean.equals("medium", ignoreCase = true) &&
+                        !clean.equals("low", ignoreCase = true) &&
+                        !clean.equals("tiny", ignoreCase = true) &&
+                        !clean.equals("high", ignoreCase = true) &&
+                        !clean.equals("ultra", ignoreCase = true) &&
+                        !clean.equals("audio", ignoreCase = true)) {
+                        langName = clean
+                    }
+                }
+            }
+
+            if (langCode == null) {
+                val match = Regex("""-(?:dubbed-)?([a-zA-Z]{2,3}(?:-[a-zA-Z0-9]+)?)$""").find(formatId)
+                if (match != null) {
+                    val candidate = match.groupValues[1].lowercase()
+                    if (candidate !in setOf("mp4", "m4a", "webm", "opus", "flv")) {
+                        langCode = candidate
+                    }
+                }
+            }
+
             val isOriginal = note?.contains("original", ignoreCase = true) == true ||
-                lang == "orig" ||
+                rawLang == "orig" ||
                 f.optInt("language_preference", 0) > 0 ||
                 (!formatId.contains("-") && note?.contains("dub", ignoreCase = true) != true)
+
             org.videopocket.probe.core.MediaFormat(
                 formatId, f.optString("ext"), reportedHeight,
-                reportedHeight > 0 || videoCodec != null && videoCodec != "none", audioCodec != null && audioCodec != "none",
+                reportedHeight > 0 || (videoCodec != null && videoCodec != "none"),
+                audioCodec != null && audioCodec != "none",
                 f.optLong("filesize", f.optLong("filesize_approx", 0)).takeIf { it > 0 },
                 f.optString("url").takeIf { it.isNotBlank() },
-                videoKnown = reportedHeight > 0 || videoCodec != null, audioKnown = audioCodec != null,
-                language = lang,
+                videoKnown = reportedHeight > 0 || videoCodec != null,
+                audioKnown = audioCodec != null,
+                language = langCode,
                 isOriginalAudio = isOriginal,
-                formatNote = note
+                formatNote = langName ?: note
             )
         }
         if (formats.isEmpty()) throw ProbeFailure(Problem.UNSUPPORTED)
 
-        val audioFormats = formats.filter { it.audio && !it.video && it.audioKnown }
+        val audioFormats = formats.filter { it.audio && !it.video }.sortedByDescending { it.bytes ?: 0 }
         val audioTracks = mutableListOf<org.videopocket.probe.core.MediaAudioTrack>()
         val seenLangs = mutableSetOf<String>()
         val origTrack = audioFormats.firstOrNull { it.isOriginalAudio } ?: audioFormats.firstOrNull()
         if (origTrack != null) {
             val code = origTrack.language ?: "orig"
-            val display = if (code == "orig") "Original Audio" else {
-                runCatching { java.util.Locale(code).getDisplayLanguage(java.util.Locale("ar")) }.getOrNull()?.takeIf { it.isNotBlank() } ?: java.util.Locale(code).displayLanguage.ifBlank { "Original Audio" }
+            val display = if (code != "orig" && code != "und") {
+                val ar = getArabicDisplayLanguage(code)
+                "$ar (الأصلي)"
+            } else {
+                "الصوت الأصلي (Original)"
             }
             audioTracks.add(org.videopocket.probe.core.MediaAudioTrack(origTrack.id, code, display, true))
             seenLangs.add(code)
+            seenLangs.add(origTrack.id)
         }
         audioFormats.forEach { fmt ->
-            val code = fmt.language
-            if (!code.isNullOrBlank() && code !in seenLangs && code != "orig") {
+            val code = fmt.language ?: fmt.id
+            if (code !in seenLangs && fmt.id != origTrack?.id) {
                 seenLangs.add(code)
-                val display = runCatching { java.util.Locale(code).getDisplayLanguage(java.util.Locale("ar")) }.getOrNull()?.takeIf { it.isNotBlank() } ?: java.util.Locale(code).displayLanguage.ifBlank { code.uppercase() }
-                audioTracks.add(org.videopocket.probe.core.MediaAudioTrack(fmt.id, code, display, fmt.isOriginalAudio))
+                val display = if (!fmt.language.isNullOrBlank() && fmt.language != "und" && fmt.language != "orig") {
+                    getArabicDisplayLanguage(fmt.language)
+                } else if (!fmt.formatNote.isNullOrBlank()) {
+                    fmt.formatNote
+                } else {
+                    fmt.id
+                }
+                audioTracks.add(org.videopocket.probe.core.MediaAudioTrack(fmt.id, fmt.language ?: fmt.id, display, fmt.isOriginalAudio))
             }
         }
 
@@ -268,27 +320,35 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             ?: formats.firstOrNull { it.url != null }?.url
 
         val subList = mutableListOf<SubtitleTrack>()
+        val seenSubLangs = mutableSetOf<String>()
         fun parseSubObject(subObj: JSONObject?, isAuto: Boolean) {
             if (subObj == null) return
             val keys = subObj.keys()
             while (keys.hasNext()) {
                 val lang = keys.next()
+                if (lang in seenSubLangs) continue
                 val langArray = subObj.optJSONArray(lang) ?: continue
                 for (k in 0 until langArray.length()) {
                     val subFormat = langArray.optJSONObject(k) ?: continue
                     val subUrl = subFormat.optString("url")
                     val ext = subFormat.optString("ext", "srt")
+                    val rawName = subFormat.optString("name").takeIf { it.isNotBlank() && it != "null" }
                     if (subUrl.isNotBlank()) {
-                        subList.add(SubtitleTrack(lang, lang.uppercase(), ext, subUrl, isAuto))
+                        val localizedName = runCatching {
+                            val loc = java.util.Locale(lang)
+                            val ar = loc.getDisplayLanguage(java.util.Locale("ar"))
+                            if (ar.isNotBlank() && !ar.equals(lang, ignoreCase = true)) ar else loc.displayLanguage
+                        }.getOrNull()?.takeIf { it.isNotBlank() } ?: rawName ?: lang.uppercase()
+                        val fullName = if (isAuto) "$localizedName (تلقائي)" else localizedName
+                        subList.add(SubtitleTrack(lang, fullName, ext, subUrl, isAuto))
+                        seenSubLangs.add(lang)
                         break
                     }
                 }
             }
         }
         parseSubObject(json.optJSONObject("subtitles"), false)
-        if (subList.isEmpty()) {
-            parseSubObject(json.optJSONObject("automatic_captions"), true)
-        }
+        parseSubObject(json.optJSONObject("automatic_captions"), true)
         val author = json.optString("uploader").ifBlank { json.optString("channel").ifBlank { json.optString("creator").ifBlank { null } } }
         val extractor = json.optString("extractor_key").ifBlank { json.optString("extractor").ifBlank { null } }
         val mediaId = json.optString("id").ifBlank { null }
@@ -319,7 +379,8 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         outputFormat: String,
         progress: (Float) -> Unit,
         removeSponsors: Boolean = false,
-        selectedAudioTrackId: String? = null
+        selectedAudioTrackId: String? = null,
+        selectedSubtitleLang: String? = null
     ): ProbeResult {
         require(outputFormat in setOf("auto", "mp4", "mkv", "webm"))
         initialize()
@@ -327,7 +388,7 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         require(bitrate in setOf(128, 192, 320))
         val isPlaylist = info.isPlaylist || action == ProbeAction.PLAYLIST_VIDEO || action == ProbeAction.PLAYLIST_MP3
         if (isPlaylist) {
-            return downloadPlaylist(url, info, action, height, bitrate, outputFormat, progress, removeSponsors)
+            return downloadPlaylist(url, info, action, height, bitrate, outputFormat, progress, removeSponsors, selectedAudioTrackId, selectedSubtitleLang)
         }
         val format = FormatPolicy.select(info, action, height, selectedAudioTrackId)
         val estimate = info.formats.filter { it.id in format.split('+') }.mapNotNull { it.bytes }.sum()
@@ -355,6 +416,15 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 req.addOption("--sponsorblock-remove", "sponsor,selfpromo,interaction")
             }
 
+            if (!selectedSubtitleLang.isNullOrBlank() && selectedSubtitleLang != "none") {
+                req.addOption("--write-subs")
+                    .addOption("--write-auto-subs")
+                    .addOption("--sub-langs", selectedSubtitleLang)
+                if (action != ProbeAction.MP3) {
+                    req.addOption("--embed-subs")
+                }
+            }
+
             checkCancelled()
             withResourceGuard(id) {
                 engine.execute(req, id) { percent, _, _ -> progress(if (percent.isFinite() && percent >= 0) percent.coerceAtMost(100f) else -1f) }
@@ -368,6 +438,15 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
             if (output.length() <= 0L) throw ProbeFailure(Problem.CONVERSION, "Empty output file")
             beginPublishing()
             val saved = publishWithName(output, action, info.title)
+
+            // Also publish any written subtitle files (.srt, .vtt) so the user has the subtitle file saved directly
+            val subFiles = folder.listFiles()?.filter { it.isFile && it.extension in setOf("srt", "vtt", "ass") } ?: emptyList()
+            subFiles.forEach { subFile ->
+                if (subFile.length() > 0) {
+                    runCatching { publishWithName(subFile, action, "${info.title}.${subFile.extension}") }
+                }
+            }
+
             return ProbeResult(action, (System.nanoTime() - started) / 1_000_000, output.length(), saved, true, tracks)
         } finally {
             if (activeProcessId == id) activeProcessId = null
@@ -476,7 +555,18 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
         }
     }
 
-    private fun downloadPlaylist(url: String, info: MediaInfo, action: ProbeAction, height: Int, bitrate: Int, outputFormat: String, progress: (Float) -> Unit, removeSponsors: Boolean = false): ProbeResult {
+    private fun downloadPlaylist(
+        url: String,
+        info: MediaInfo,
+        action: ProbeAction,
+        height: Int,
+        bitrate: Int,
+        outputFormat: String,
+        progress: (Float) -> Unit,
+        removeSponsors: Boolean = false,
+        selectedAudioTrackId: String? = null,
+        selectedSubtitleLang: String? = null
+    ): ProbeResult {
         if (StatFs(context.noBackupFilesDir.path).availableBytes < 512L * 1024 * 1024)
             throw ProbeFailure(Problem.SPACE)
         val id = UUID.randomUUID().toString()
@@ -494,8 +584,18 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                 req.addOption("--sponsorblock-remove", "sponsor,selfpromo,interaction")
             }
 
+            if (!selectedSubtitleLang.isNullOrBlank() && selectedSubtitleLang != "none") {
+                req.addOption("--write-subs")
+                    .addOption("--write-auto-subs")
+                    .addOption("--sub-langs", selectedSubtitleLang)
+                if (action !in setOf(ProbeAction.MP3, ProbeAction.PLAYLIST_MP3)) {
+                    req.addOption("--embed-subs")
+                }
+            }
+
             if (action == ProbeAction.MP3 || action == ProbeAction.PLAYLIST_MP3) {
-                req.addOption("--format", "bestaudio[format_note*=original]/bestaudio/best")
+                val audioFmt = if (!selectedAudioTrackId.isNullOrBlank()) selectedAudioTrackId else "bestaudio[format_note*=original]/bestaudio/best"
+                req.addOption("--format", audioFmt)
                     .addOption("-x")
                     .addOption("--audio-format", "mp3")
                     .addOption("--audio-quality", "${bitrate}K")
@@ -503,7 +603,8 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
                     .addOption("--embed-thumbnail")
                     .addOption("--convert-thumbnails", "jpg")
             } else {
-                req.addOption("--format", "bestvideo[height<=$height]+bestaudio[format_note*=original]/bestvideo[height<=$height]+bestaudio/best[height<=$height]/best")
+                val audioFmt = if (!selectedAudioTrackId.isNullOrBlank()) selectedAudioTrackId else "bestaudio[format_note*=original]/bestaudio/best"
+                req.addOption("--format", "bestvideo[height<=$height]+$audioFmt/bestvideo[height<=$height]+bestaudio/best[height<=$height]/best")
                     .addOption("--merge-output-format", if (outputFormat == "auto") "mkv" else outputFormat)
             }
 
@@ -581,7 +682,9 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
     fun publishWithName(file: File, action: ProbeAction, baseName: String): String {
         val mime = when (file.extension) {
             "mp3" -> "audio/mpeg"; "mp4" -> "video/mp4"; "webm" -> "video/webm"
-            "mkv" -> "video/x-matroska"; "m4a" -> "audio/mp4"; "wav" -> "audio/wav"; else -> "video/quicktime"
+            "mkv" -> "video/x-matroska"; "m4a" -> "audio/mp4"; "wav" -> "audio/wav"
+            "srt" -> "application/x-subrip"; "vtt" -> "text/vtt"; "ass" -> "text/x-ssa"
+            else -> "video/quicktime"
         }
         val cleanBase = org.videopocket.probe.storage.FileNamingEngine.sanitize(baseName).take(100)
         val displayName = "${cleanBase}-${UUID.randomUUID().toString().take(8)}.${file.extension}"
@@ -602,6 +705,40 @@ class ProbeEngine(private val context: Context) : MediaInspector, MediaDownloade
     }
 
     companion object {
+        val KNOWN_LANG_MAP = mapOf(
+            "arabic" to "ar", "العربية" to "ar",
+            "english" to "en", "الإنجليزية" to "en",
+            "spanish" to "es", "الإسبانية" to "es",
+            "french" to "fr", "الفرنسية" to "fr",
+            "german" to "de", "الألمانية" to "de",
+            "italian" to "it", "الإيطالية" to "it",
+            "portuguese" to "pt", "البرتغالية" to "pt",
+            "russian" to "ru", "الروسية" to "ru",
+            "hindi" to "hi", "الهندية" to "hi",
+            "turkish" to "tr", "التركية" to "tr",
+            "japanese" to "ja", "اليابانية" to "ja",
+            "korean" to "ko", "الكورية" to "ko",
+            "chinese" to "zh", "الصينية" to "zh",
+            "urdu" to "ur", "الأردية" to "ur",
+            "indonesian" to "id", "الإندونيسية" to "id",
+            "bengali" to "bn", "البنغالية" to "bn",
+            "persian" to "fa", "الفارسية" to "fa",
+            "vietnamese" to "vi", "الفيتنامية" to "vi",
+            "dutch" to "nl", "الهولندية" to "nl",
+            "polish" to "pl", "البولندية" to "pl",
+            "ukrainian" to "uk", "الأوكرانية" to "uk"
+        )
+
+        fun getArabicDisplayLanguage(code: String): String {
+            if (code.isBlank() || code == "und" || code == "orig") return "Original"
+            return runCatching {
+                val locale = java.util.Locale(code)
+                val arName = locale.getDisplayLanguage(java.util.Locale("ar"))
+                if (arName.isNotBlank() && !arName.equals(code, ignoreCase = true)) arName
+                else locale.displayLanguage.takeIf { it.isNotBlank() } ?: code.uppercase()
+            }.getOrDefault(code.uppercase())
+        }
+
         @Volatile private var cachedInitResult: JSONObject? = null
         private val initLock = Any()
         private val WATCHDOG = java.util.concurrent.Executors.newSingleThreadScheduledExecutor { runnable ->

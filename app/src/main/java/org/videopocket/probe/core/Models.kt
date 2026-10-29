@@ -205,9 +205,9 @@ object FormatPolicy {
             if (!id.matches(Regex("[A-Za-z0-9_.-]+"))) throw ProbeFailure(Problem.UNSUPPORTED)
             return id
         }
-        val allAudio = info.formats.filter { it.audio && !it.video && it.videoKnown }
+        val allAudio = info.formats.filter { it.audio && !it.video }
         val audio = if (!preferredAudioId.isNullOrBlank()) {
-            allAudio.firstOrNull { it.id == preferredAudioId } ?: allAudio.maxByOrNull { it.bytes ?: 0 }
+            info.formats.firstOrNull { it.id == preferredAudioId } ?: allAudio.firstOrNull { it.id == preferredAudioId } ?: allAudio.maxByOrNull { it.bytes ?: 0 }
         } else {
             val originals = allAudio.filter {
                 it.isOriginalAudio ||

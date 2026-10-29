@@ -30,7 +30,8 @@ class QueueStore(context: Context) {
                 elapsedMs = if (json.has("elapsedMs") && !json.isNull("elapsedMs")) json.getLong("elapsedMs").takeIf { it >= 0 } else null,
                 validationDetail = json.optString("validationDetail").takeIf { it.isNotBlank() && it != "null" },
                 createdAt = json.optLong("createdAt"), progress = if (savedState == DownloadState.COMPLETED) 100f else -1f,
-                selectedAudioTrackId = json.optString("selectedAudioTrackId").ifBlank { null })
+                selectedAudioTrackId = json.optString("selectedAudioTrackId").ifBlank { null },
+                selectedSubtitleLang = json.optString("selectedSubtitleLang").ifBlank { null })
         }
     }
     fun save(tasks: List<DownloadTask>) {
@@ -43,6 +44,7 @@ class QueueStore(context: Context) {
                 put("outputUri", task.outputUri ?: ""); put("bytes", task.bytes); put("createdAt", task.createdAt)
                 put("elapsedMs", task.elapsedMs ?: JSONObject.NULL); put("validationDetail", task.validationDetail ?: JSONObject.NULL)
                 if (task.selectedAudioTrackId != null) put("selectedAudioTrackId", task.selectedAudioTrackId)
+                if (task.selectedSubtitleLang != null) put("selectedSubtitleLang", task.selectedSubtitleLang)
                 task.clipRequest?.let { clip -> put("clip", JSONObject().apply {
                     put("start", clip.startSeconds); put("end", clip.endSeconds); put("height", clip.height)
                     put("format", clip.format); put("best", clip.isBestQuality); put("audio", clip.isAudioOnly)

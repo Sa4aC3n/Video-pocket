@@ -56,6 +56,9 @@ fun HomeScreen(
     var selectedAudioTrackId by rememberSaveable(model.info?.id) {
         mutableStateOf(model.info?.audioTracks?.firstOrNull { it.isOriginal }?.id ?: model.info?.audioTracks?.firstOrNull()?.id)
     }
+    var selectedSubtitleLang by rememberSaveable(model.info?.id) {
+        mutableStateOf<String?>("none")
+    }
 
     var showSupportedSources by remember { mutableStateOf(false) }
     var showBatchDownload by remember { mutableStateOf(false) }
@@ -108,6 +111,7 @@ fun HomeScreen(
         sponsorSegments.clear()
         model.info?.let {
             selectedAudioTrackId = it.audioTracks.firstOrNull { t -> t.isOriginal }?.id ?: it.audioTracks.firstOrNull()?.id
+            selectedSubtitleLang = "none"
             val vidId = it.id ?: SponsorBlockClient.extractVideoId(model.inspectedUrl)
             if (vidId != null) {
                 val list = SponsorBlockClient.getSegments(vidId)
@@ -627,7 +631,7 @@ fun HomeScreen(
                         }
                     }
 
-                    if (media.audioTracks.size > 1) {
+                    if (media.audioTracks.isNotEmpty()) {
                         Surface(
                             shape = RoundedCornerShape(12.dp),
                             color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
@@ -645,7 +649,8 @@ fun HomeScreen(
                                         modifier = Modifier.size(16.dp)
                                     )
                                     Text(
-                                        t("Audio Language / Dub:", "لغة الصوت / الدبلجة:"),
+                                        if (media.audioTracks.size > 1) t("Audio Language / Dub:", "لغة الصوت / الدبلجة:")
+                                        else t("Audio Language:", "لغة الصوت:"),
                                         style = MaterialTheme.typography.labelMedium,
                                         fontWeight = FontWeight.Bold
                                     )
@@ -675,6 +680,58 @@ fun HomeScreen(
                         }
                     }
 
+                    if (media.subtitles.isNotEmpty()) {
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Icon(
+                                        Icons.Default.Subtitles,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                    Text(
+                                        t("Subtitles (Download / Embed):", "الترجمة (تحميل ودمج مع الفيديو):"),
+                                        style = MaterialTheme.typography.labelMedium,
+                                        fontWeight = FontWeight.Bold
+                                    )
+                                }
+                                Row(
+                                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    val isNoneSel = selectedSubtitleLang == null || selectedSubtitleLang == "none"
+                                    FilterChip(
+                                        selected = isNoneSel,
+                                        onClick = { selectedSubtitleLang = "none" },
+                                        label = { Text(t("None", "بدون ترجمة")) },
+                                        leadingIcon = if (isNoneSel) {
+                                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                        } else null
+                                    )
+                                    media.subtitles.forEach { sub ->
+                                        val isSel = selectedSubtitleLang == sub.lang
+                                        FilterChip(
+                                            selected = isSel,
+                                            onClick = { selectedSubtitleLang = sub.lang },
+                                            label = { Text(sub.name) },
+                                            leadingIcon = if (isSel) {
+                                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                                            } else null
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     // Quick Download and Custom Options row
                     Row(
                         modifier = Modifier.fillMaxWidth(),
@@ -684,7 +741,7 @@ fun HomeScreen(
                             onClick = {
                                 triggerDownloadWithDuplicateCheck {
                                     val action = if (media.isPlaylist) ProbeAction.PLAYLIST_VIDEO else ProbeAction.VIDEO
-                                    model.run(action, selectedHeight, selectedBitrate, videoFormat, removeSponsors = cleanDownloadWithoutSponsors, selectedAudioTrackId = selectedAudioTrackId)
+                                    model.run(action, selectedHeight, selectedBitrate, videoFormat, removeSponsors = cleanDownloadWithoutSponsors, selectedAudioTrackId = selectedAudioTrackId, selectedSubtitleLang = selectedSubtitleLang)
                                 }
                             },
                             enabled = !model.busy,
@@ -818,7 +875,7 @@ fun HomeScreen(
                                 Button(
                                     onClick = {
                                         triggerDownloadWithDuplicateCheck {
-                                            model.run(ProbeAction.VIDEO, selectedHeight, selectedBitrate, videoFormat, removeSponsors = cleanDownloadWithoutSponsors, selectedAudioTrackId = selectedAudioTrackId)
+                                            model.run(ProbeAction.VIDEO, selectedHeight, selectedBitrate, videoFormat, removeSponsors = cleanDownloadWithoutSponsors, selectedAudioTrackId = selectedAudioTrackId, selectedSubtitleLang = selectedSubtitleLang)
                                         }
                                     },
                                     enabled = !model.busy,
@@ -1045,14 +1102,21 @@ fun HomeScreen(
             initialHeight = selectedHeight,
             initialFormat = videoFormat,
             initialAudioTrackId = selectedAudioTrackId,
+            initialSubtitleLang = selectedSubtitleLang,
             arabic = arabic,
             onDismiss = { showDownloadOptionsSheet = false },
-            onConfirmDownload = { height, fmt, trackId ->
+            onConfirmDownload = { height, fmt, trackId, subLang ->
                 selectedHeight = height
                 videoFormat = fmt
                 if (trackId != null) selectedAudioTrackId = trackId
+                if (subLang != null) selectedSubtitleLang = subLang
                 triggerDownloadWithDuplicateCheck {
-                    model.run(ProbeAction.VIDEO, height, selectedBitrate, fmt, removeSponsors = cleanDownloadWithoutSponsors, selectedAudioTrackId = trackId ?: selectedAudioTrackId)
+                    model.run(
+                        ProbeAction.VIDEO, height, selectedBitrate, fmt,
+                        removeSponsors = cleanDownloadWithoutSponsors,
+                        selectedAudioTrackId = trackId ?: selectedAudioTrackId,
+                        selectedSubtitleLang = subLang ?: selectedSubtitleLang
+                    )
                 }
             }
         )

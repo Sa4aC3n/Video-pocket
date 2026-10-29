@@ -266,15 +266,19 @@ fun DownloadOptionsBottomSheet(
     initialHeight: Int,
     initialFormat: String,
     initialAudioTrackId: String? = null,
+    initialSubtitleLang: String? = "none",
     arabic: Boolean,
     onDismiss: () -> Unit,
-    onConfirmDownload: (height: Int, format: String, audioTrackId: String?) -> Unit
+    onConfirmDownload: (height: Int, format: String, audioTrackId: String?, subtitleLang: String?) -> Unit
 ) {
     fun t(en: String, ar: String) = if (arabic) ar else en
     var selectedHeight by remember { mutableIntStateOf(initialHeight) }
     var selectedFormat by remember { mutableStateOf(initialFormat) }
     var selectedAudioTrackId by remember {
         mutableStateOf(initialAudioTrackId ?: media.audioTracks.firstOrNull { it.isOriginal }?.id ?: media.audioTracks.firstOrNull()?.id)
+    }
+    var selectedSubtitleLang by remember {
+        mutableStateOf(initialSubtitleLang ?: "none")
     }
 
     ModalBottomSheet(
@@ -362,10 +366,11 @@ fun DownloadOptionsBottomSheet(
                 }
             }
 
-            if (media.audioTracks.size > 1) {
+            if (media.audioTracks.isNotEmpty()) {
                 HorizontalDivider()
                 Text(
-                    text = t("Audio Language / Dub:", "لغة الصوت / الدبلجة:"),
+                    text = if (media.audioTracks.size > 1) t("Audio Language / Dub:", "لغة الصوت / الدبلجة:")
+                    else t("Audio Language:", "لغة الصوت:"),
                     style = MaterialTheme.typography.labelMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.secondary
@@ -390,11 +395,46 @@ fun DownloadOptionsBottomSheet(
                 }
             }
 
+            if (media.subtitles.isNotEmpty()) {
+                HorizontalDivider()
+                Text(
+                    text = t("Subtitles (Download / Embed):", "الترجمة (تحميل ودمج مع الفيديو):"),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.secondary
+                )
+                Row(
+                    modifier = Modifier.horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val isNoneSel = selectedSubtitleLang == null || selectedSubtitleLang == "none"
+                    FilterChip(
+                        selected = isNoneSel,
+                        onClick = { selectedSubtitleLang = "none" },
+                        label = { Text(t("None", "بدون ترجمة")) },
+                        leadingIcon = if (isNoneSel) {
+                            { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                        } else null
+                    )
+                    media.subtitles.forEach { sub ->
+                        val isSel = selectedSubtitleLang == sub.lang
+                        FilterChip(
+                            selected = isSel,
+                            onClick = { selectedSubtitleLang = sub.lang },
+                            label = { Text(sub.name) },
+                            leadingIcon = if (isSel) {
+                                { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(14.dp)) }
+                            } else null
+                        )
+                    }
+                }
+            }
+
             Spacer(Modifier.height(8.dp))
 
             Button(
                 onClick = {
-                    onConfirmDownload(selectedHeight, selectedFormat, selectedAudioTrackId)
+                    onConfirmDownload(selectedHeight, selectedFormat, selectedAudioTrackId, selectedSubtitleLang)
                     onDismiss()
                 },
                 shape = RoundedCornerShape(16.dp),

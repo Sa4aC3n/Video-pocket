@@ -16,8 +16,8 @@ android {
         applicationId = "org.videopocket.probe"
         minSdk = 29
         targetSdk = 36
-        versionCode = 10
-        versionName = "10"
+        versionCode = 11
+        versionName = "11"
         ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a", "x86_64") }
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         testInstrumentationRunnerArguments["useTestStorageService"] = "true"
@@ -51,11 +51,18 @@ android {
             val propAliasPass: String? = keystoreProperties.getProperty("release.keyPassword")
             val aliasPass = envAliasPass ?: propAliasPass ?: keyPass
 
-            if (!keyPath.isNullOrEmpty() && file(keyPath).exists() && !keyPass.isNullOrEmpty()) {
-                storeFile = file(keyPath)
+            val keyFile = if (!keyPath.isNullOrEmpty()) {
+                val candidate = file(keyPath)
+                if (candidate.exists()) candidate else rootProject.file(keyPath)
+            } else defaultKeyFile
+
+            if (keyFile.exists() && !keyPass.isNullOrEmpty()) {
+                storeFile = keyFile
                 storePassword = keyPass
                 keyAlias = alias
                 keyPassword = aliasPass
+                enableV1Signing = true
+                enableV2Signing = true
             }
         }
     }

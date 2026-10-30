@@ -41,7 +41,7 @@ android {
 
             val envPass: String? = System.getenv("KEYSTORE_PASSWORD")
             val propPass: String? = keystoreProperties.getProperty("release.keystorePassword")
-            val keyPass = envPass ?: propPass ?: "VideoPocket2026!"
+            val keyPass = envPass ?: propPass
 
             val envAlias: String? = System.getenv("KEY_ALIAS")
             val propAlias: String? = keystoreProperties.getProperty("release.keyAlias")
@@ -51,7 +51,7 @@ android {
             val propAliasPass: String? = keystoreProperties.getProperty("release.keyPassword")
             val aliasPass = envAliasPass ?: propAliasPass ?: keyPass
 
-            if (!keyPath.isNullOrEmpty() && file(keyPath).exists()) {
+            if (!keyPath.isNullOrEmpty() && file(keyPath).exists() && !keyPass.isNullOrEmpty()) {
                 storeFile = file(keyPath)
                 storePassword = keyPass
                 keyAlias = alias
@@ -76,7 +76,7 @@ android {
             if (releaseSigning?.storeFile != null && releaseSigning.storeFile!!.exists()) {
                 signingConfig = releaseSigning
             } else {
-                signingConfig = signingConfigs.getByName("debug")
+                signingConfig = null // Default unsigned for Google Play App Signing (never sign release with debug key)
             }
         }
     }
